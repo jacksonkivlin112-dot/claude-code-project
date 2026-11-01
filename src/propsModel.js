@@ -264,16 +264,16 @@ const MARKET_ALIASES = [
   ['player_receptions', ['receptions', 'rec', 'catches']],
 ];
 
-export function matchMarket(text) {
-  const t = ` ${text.toLowerCase().replace(/\s+/g, ' ').trim()} `;
-  for (const [key, aliases] of MARKET_ALIASES) {
+export function matchMarket(text, table = MARKET_ALIASES) {
+  const t = ` ${text.toLowerCase().replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim()} `;
+  for (const [key, aliases] of table) {
     for (const a of aliases) if (t.includes(` ${a} `)) return { key, alias: a };
   }
   return null;
 }
 
 /** Parse lines like "Josh Allen, Pass Yards, 245.5" or "Josh Allen Pass Yds 245.5". */
-export function parseManual(text) {
+export function parseManual(text, table = MARKET_ALIASES) {
   const out = [];
   const errors = [];
   for (const raw of text.split('\n')) {
@@ -281,10 +281,10 @@ export function parseManual(text) {
     if (!lineTxt) continue;
     const num = lineTxt.match(/(-?\d+(?:\.\d+)?)\s*$/);
     if (!num) { errors.push(`No line number in "${lineTxt}"`); continue; }
-    const rest = lineTxt.slice(0, num.index).replace(/[,|\t]+/g, ' ').trim();
-    const mk = matchMarket(rest);
+    const rest = lineTxt.slice(0, num.index).replace(/[,|\t]+/g, ' ').replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim();
+    const mk = matchMarket(rest, table);
     if (!mk) { errors.push(`Unknown stat in "${lineTxt}"`); continue; }
-    const idx = rest.toLowerCase().lastIndexOf(mk.alias);
+    const idx = rest.toLowerCase().replace(/\s+/g, ' ').lastIndexOf(mk.alias);
     const player = rest.slice(0, idx).trim();
     if (!player) { errors.push(`No player name in "${lineTxt}"`); continue; }
     out.push({ player, market: mk.key, line: Number(num[1]) });

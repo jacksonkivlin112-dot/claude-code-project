@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useData, usePersistentState } from '../data.jsx';
-import { DEFAULT_MARKETS, MARKETS, fetchPrizePicksLines, listEvents, normName } from '../oddsapi.js';
+import { SPORTS, fetchPrizePicksLines, listEvents, normName } from '../oddsapi.js';
 import { BREAKEVEN, buildLookups, evaluateProp, parseManual } from '../propsModel.js';
+import { parseManualNba } from '../nba/props.js';
 import { useProjectionRows, useTeamOutlook } from '../components/players.jsx';
 import { Avatar, Card, Empty, InjuryDot, PosBadge, Segmented, SkeletonRows, TeamLogo, WeeklyBars, f1, kickoff, timeAgo, useNow, useUi } from '../components/ui.jsx';
 
-const LS = {
-  key: 'ge:pref:oddsKey',
-  manual: 'ge:props:manual',
-  lines: 'ge:props:lastLines',
-  live: 'ge:props:live',
+const lsKeys = (sport) => {
+  const sfx = sport === 'nba' ? ':nba' : '';
+  return { key: 'ge:pref:oddsKey', manual: `ge:props:manual${sfx}`, lines: `ge:props:lastLines${sfx}`, live: `ge:props:live${sfx}` };
 };
 const readJSON = (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
 
 /** Remember the last line seen for each prop so line moves can be flagged. */
-function withMovement(props) {
+function withMovement(props, LS) {
   const last = readJSON(LS.lines, {});
   const next = { ...last };
   const out = props.map((p) => {
@@ -27,16 +26,18 @@ function withMovement(props) {
   return out;
 }
 
-function usePropLines() {
+function usePropLines(sport) {
+  const LS = lsKeys(sport);
+  const marketsMap = SPORTS[sport].markets;
   const [snapshot, setSnapshot] = useState(null); // {generatedAt, props} | false
   const [live, setLive] = useState(() => readJSON(LS.live, null)); // {fetchedAt, props, remaining}
   const [manual, setManualState] = useState(() => readJSON(LS.manual, []));
   const [apiKey, setApiKeyState] = useState(() => { try { return localStorage.getItem(LS.key) || ''; } catch { return ''; } });
   const [interval, setIntervalPref] = usePersistentState('propsInterval', '15');
-  const [marketsPref, setMarketsPref] = usePersistentState('propsMarkets', DEFAULT_MARKETS.join(','));
+  const [marketsPref, setMarketsPref] = usePersistentState(sport === 'nba' ? 'nbaPropsMarkets' : 'propsMarkets', Object.keys(marketsMap).join(','));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const markets = marketsPref.split(',').filter((m) => MARKETS[m]);
+  const markets = marketsPref.split(',').filter((m) => marketsMap[m]);
 
   const setManual = (v) => { setManualState(v); writeJSON(LS.manual, v); };
   const setApiKey = (k) => {
@@ -45,19 +46,19 @@ function usePropLines() {
   };
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/props.json`, { cache: 'no-cache' })
+    fetch(`${import.meta.env.BASE_URL}data/${sport === 'nba' ? 'nba/' : ''}props.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : false))
-      .then((j) => setSnapshot(j && Array.isArray(j.props) ? { ...j, props: withMovement(j.props) } : false))
+      .then((j) => setSnapshot(j && Array.isArray(j.props) ? { ...j, props: withMovement(j.props, LS) } : false))
       .catch(() => setSnapshot(false));
-  }, []);
+  }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refresh = useCallback(async () => {
     if (!apiKey) return;
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetchPrizePicksLines(apiKey, { markets });
-      const data = { fetchedAt: new Date().toISOString(), props: withMovement(res.props), remaining: res.remaining, used: res.used, games: res.events };
+      const res = await fetchPrizePicksLines(apiKey, { sport, markets });
+      const data = { fetchedAt: new Date().toISOString(), props: withMovement(res.props, LS), remaining: res.remaining, used: res.used, games: res.events };
       setLive(data);
       writeJSON(LS.live, data);
     } catch (e) {
@@ -65,7 +66,7 @@ function usePropLines() {
     } finally {
       setBusy(false);
     }
-  }, [apiKey, markets.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [apiKey, sport, markets.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh while the page is open (credit-aware: user picks the interval).
   useEffect(() => {
@@ -85,29 +86,19 @@ function usePropLines() {
   const lines = [...fetched, ...manualRows.filter((m) => !fetchedIds.has(m.id.slice(2)))];
 
   return {
-    lines, source, asOf, snapshotLoaded: snapshot !== null, live, manual, setManual, apiKey, setApiKey,
+    sport, marketsMap, lines, source, asOf, snapshotLoaded: snapshot !== null, live, manual, setManual, apiKey, setApiKey,
     interval, setIntervalPref, markets, setMarkets: (arr) => setMarketsPref(arr.join(',')), refresh, busy, err,
   };
 }
 
 const GRADE_ORDER = { strong: 3, solid: 2, lean: 1, pass: 0 };
 
-export default function Props() {
+/** NFL evaluator: joins lines with projections, season logs and the team model. */
+function useNflEvaluator() {
   const { core, season, ranks, liveById, gameByTeam, teams } = useData();
   const rows = useProjectionRows(core?.week);
   const outlook = useTeamOutlook();
-  const P = usePropLines();
-  useNow(30000);
-
-  const [market, setMarket] = useState('ALL');
-  const [side, setSide] = useState('ALL');
-  const [minGrade, setMinGrade] = useState('lean');
-  const [q, setQ] = useState('');
-  const [sort, setSort] = useState('prob');
-  const [showSettings, setShowSettings] = useState(false);
-  const [showStarted, setShowStarted] = useState(false);
-
-  const evaluated = useMemo(() => {
+  return useMemo(() => {
     if (!rows || !outlook) return null;
     const ctx = {
       lookups: buildLookups(rows, season, teams),
@@ -118,8 +109,33 @@ export default function Props() {
       liveById,
       gameByTeam,
     };
-    return P.lines.map((l) => evaluateProp(l, ctx)).filter(Boolean);
-  }, [rows, outlook, P.lines, season, ranks, liveById, gameByTeam, teams]);
+    return { evaluate: (lines) => lines.map((l) => evaluateProp(l, ctx)).filter(Boolean), knownNames: rows.map((r) => r.name) };
+  }, [rows, outlook, season, ranks, liveById, gameByTeam, teams]);
+}
+
+export default function Props() {
+  return <PropsPage sport="nfl" useEvaluator={useNflEvaluator} />;
+}
+
+const EXAMPLES = {
+  nfl: 'Josh Allen, Pass Yards, 245.5\nBijan Robinson Rush Yds 82.5\nPuka Nacua, Receptions, 6.5',
+  nba: 'Nikola Jokic, Points, 27.5\nVictor Wembanyama Rebounds 11.5\nTyrese Haliburton, PRA, 35.5',
+};
+
+export function PropsPage({ sport, useEvaluator }) {
+  const P = usePropLines(sport);
+  const evaluator = useEvaluator();
+  useNow(30000);
+
+  const [market, setMarket] = useState('ALL');
+  const [side, setSide] = useState('ALL');
+  const [minGrade, setMinGrade] = useState('lean');
+  const [q, setQ] = useState('');
+  const [sort, setSort] = useState('prob');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showStarted, setShowStarted] = useState(false);
+
+  const evaluated = useMemo(() => (evaluator ? evaluator.evaluate(P.lines) : null), [evaluator, P.lines]);
 
   const marketsPresent = useMemo(() => [...new Set((evaluated || []).map((e) => e.market))], [evaluated]);
 
@@ -145,7 +161,7 @@ export default function Props() {
       <div className="page-head">
         <div>
           <p className="eyebrow">Player props</p>
-          <h1>PrizePicks Over / Under</h1>
+          <h1>{sport === 'nba' ? 'NBA ' : ''}PrizePicks Over / Under</h1>
           <p className="hero-sub">
             Each line is run through our model: projection, season and recent form, opponent matchup, game script and injuries. The result is a hit probability for the over and the under. Picks need to clear PrizePicks’ ~{Math.round(BREAKEVEN * 1000) / 10}% per-leg break-even to count as an edge.
           </p>
@@ -165,12 +181,12 @@ export default function Props() {
 
       {P.err && <div className="banner error" role="alert"><span><strong>Couldn’t refresh lines.</strong> {P.err}</span><button type="button" className="btn" onClick={P.refresh}>Retry</button></div>}
 
-      {showSettings && <SourceSettings P={P} rows={rows} />}
+      {showSettings && <SourceSettings P={P} knownNames={evaluator?.knownNames} />}
 
       {!evaluated || !P.snapshotLoaded ? (
         <Card><SkeletonRows n={6} h={64} /></Card>
       ) : P.lines.length === 0 ? (
-        <NoLines onSetup={() => setShowSettings(true)} />
+        <NoLines sport={sport} onSetup={() => setShowSettings(true)} />
       ) : (
         <>
           {best.length > 0 && (
@@ -191,7 +207,7 @@ export default function Props() {
           <div className="toolbar">
             <select value={market} onChange={(e) => setMarket(e.target.value)} aria-label="Stat type">
               <option value="ALL">All stats</option>
-              {marketsPresent.map((m) => <option key={m} value={m}>{MARKETS[m].label}</option>)}
+              {marketsPresent.map((m) => <option key={m} value={m}>{P.marketsMap[m].label}</option>)}
             </select>
             <Segmented options={['ALL', 'OVER', 'UNDER']} value={side} onChange={setSide} label="Pick side" />
             <select value={minGrade} onChange={(e) => setMinGrade(e.target.value)} aria-label="Minimum confidence">
@@ -272,7 +288,7 @@ function HitDots({ recent, line }) {
   return (
     <span className="hit-dots" aria-label="Recent games vs line">
       {recent.map((h) => (
-        <span key={h.week} className={`hd ${h.push ? 'push' : h.over ? 'over' : 'under'}`} title={`Wk ${h.week} vs ${h.opp}: ${f1(h.val)} (${h.push ? 'push' : h.over ? 'over' : 'under'} ${line})`} />
+        <span key={h.week} className={`hd ${h.push ? 'push' : h.over ? 'over' : 'under'}`} title={`${h.label || `Wk ${h.week} vs ${h.opp}`}: ${f1(h.val)} (${h.push ? 'push' : h.over ? 'over' : 'under'} ${line})`} />
       ))}
     </span>
   );
@@ -283,7 +299,7 @@ function BestCard({ e }) {
   return (
     <button type="button" className={`best-card ${e.side}`} onClick={() => e.playerId && openPlayer(e.playerId)}>
       <div className="best-top">
-        <Avatar player={{ id: e.playerId || '0', pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] }} size={40} />
+        <Avatar player={{ id: e.playerId || '0', sport: e.sport, pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] }} size={40} />
         <div className="best-name">
           <strong>{e.player}</strong>
           <span className="muted">{e.team} {e.opp ? `vs ${e.opp}` : ''}</span>
@@ -308,7 +324,7 @@ function PropRow({ e }) {
   const { gameByTeam } = useData();
   const g = e.team ? gameByTeam[e.team] : null;
   const away = g && g.away.abbr === e.team;
-  const playerish = { id: e.playerId || '0', pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] };
+  const playerish = { id: e.playerId || '0', sport: e.sport, pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] };
   return (
     <article className={`prop ${openRow ? 'open' : ''} ${e.started ? 'started' : ''}`}>
       <button type="button" className="prop-main" onClick={() => setOpen((o) => !o)} aria-expanded={openRow}>
@@ -372,14 +388,16 @@ function PropRow({ e }) {
             </div>
           </div>
           <div className="prop-chart">
-            <h3>{e.marketShort} by week vs line</h3>
+            <h3>{e.marketShort} by {e.sport === 'nba' ? 'game' : 'week'} vs line</h3>
             {e.recent?.length ? (
               <WeeklyBars
                 height={150}
                 maxWeek={Math.max(...e.recent.map((h) => h.week))}
+                minWeek={e.sport === 'nba' ? Math.min(...e.recent.map((h) => h.week)) : 1}
                 refLine={e.line}
                 refLabel="line"
-                data={e.recent.map((h) => ({ week: h.week, value: h.val, label: `vs ${h.opp}`, tone: h.over ? 'up' : 'down' }))}
+                data={e.recent.map((h) => ({ week: h.week, value: h.val, label: h.label || `vs ${h.opp}`, tone: h.over ? 'up' : 'down' }))}
+                axisLabel={e.sport === 'nba' ? (w) => { const h = e.recent.find((x) => x.week === w); return h ? h.label.split(' ')[0] : ''; } : undefined}
               />
             ) : (
               <Empty title="No game history yet" />
@@ -391,7 +409,7 @@ function PropRow({ e }) {
   );
 }
 
-function NoLines({ onSetup }) {
+function NoLines({ sport, onSetup }) {
   return (
     <Card>
       <div className="nolines">
@@ -401,7 +419,7 @@ function NoLines({ onSetup }) {
         <ol className="steps">
           <li><strong>Site-wide (recommended):</strong> add an <code>ODDS_API_KEY</code> repository secret. The scheduled GitHub Action then refreshes lines for everyone.</li>
           <li><strong>Just this browser:</strong> paste your own The Odds API key under <em>Line sources</em> to auto-refresh lines while this page is open.</li>
-          <li><strong>Manual:</strong> paste lines straight from the PrizePicks app, like <code>Josh Allen, Pass Yards, 245.5</code>.</li>
+          <li><strong>Manual:</strong> paste lines straight from the PrizePicks app, like <code>{EXAMPLES[sport].split('\n')[0]}</code>.</li>
         </ol>
         <button type="button" className="btn" onClick={onSetup}>Set up line sources</button>
       </div>
@@ -409,7 +427,7 @@ function NoLines({ onSetup }) {
   );
 }
 
-function SourceSettings({ P, rows }) {
+function SourceSettings({ P, knownNames }) {
   const [keyInput, setKeyInput] = useState(P.apiKey);
   const [paste, setPaste] = useState('');
   const [msg, setMsg] = useState(null);
@@ -417,14 +435,15 @@ function SourceSettings({ P, rows }) {
 
   useEffect(() => {
     if (!P.apiKey) return;
-    listEvents(P.apiKey)
-      .then((ev) => setGames(ev.filter((e) => { const t = new Date(e.commence_time).getTime(); return t > Date.now() && t - Date.now() < 8 * 86400000; }).length))
+    const horizon = P.sport === 'nba' ? 36 * 3600000 : 8 * 86400000;
+    listEvents(P.apiKey, fetch, P.sport)
+      .then((ev) => setGames(ev.filter((e) => { const t = new Date(e.commence_time).getTime(); return t > Date.now() && t - Date.now() < horizon; }).length))
       .catch(() => setGames(null));
-  }, [P.apiKey]);
+  }, [P.apiKey, P.sport]);
 
   const addManual = () => {
-    const { rows: parsed, errors } = parseManual(paste);
-    const names = new Set((rows || []).map((r) => normName(r.name)));
+    const { rows: parsed, errors } = P.sport === 'nba' ? parseManualNba(paste) : parseManual(paste);
+    const names = new Set((knownNames || []).map(normName));
     const unknown = parsed.filter((p) => !names.has(normName(p.player))).map((p) => p.player);
     const merged = [...P.manual.filter((m) => !parsed.some((p) => normName(p.player) === normName(m.player) && p.market === m.market)), ...parsed.map((p) => ({ ...p, added: Date.now() }))];
     P.setManual(merged);
@@ -432,7 +451,7 @@ function SourceSettings({ P, rows }) {
     setMsg([
       `Added ${parsed.length} line${parsed.length === 1 ? '' : 's'}.`,
       ...errors,
-      ...(unknown.length ? [`Not projected this week (check spelling, or the player may be injured or on bye): ${unknown.join(', ')}`] : []),
+      ...(unknown.length ? [`Not projected ${P.sport === 'nba' ? 'for this slate' : 'this week'} (check spelling, or the player may be injured${P.sport === 'nba' ? ' or not playing' : ' or on bye'}): ${unknown.join(', ')}`] : []),
     ]);
   };
 
@@ -464,7 +483,7 @@ function SourceSettings({ P, rows }) {
           <div className="field">
             <span>Stat types</span>
             <div className="chips">
-              {Object.entries(MARKETS).map(([k, m]) => (
+              {Object.entries(P.marketsMap).map(([k, m]) => (
                 <button type="button" key={k} className={`chip ${P.markets.includes(k) ? 'on' : ''}`} onClick={() => toggleMarket(k)}>{m.short}</button>
               ))}
             </div>
@@ -477,14 +496,14 @@ function SourceSettings({ P, rows }) {
       </Card>
       <Card title="Add lines manually" subtitle="One per line: player, stat, line">
         <div className="form">
-          <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={6} placeholder={'Josh Allen, Pass Yards, 245.5\nBijan Robinson Rush Yds 82.5\nPuka Nacua, Receptions, 6.5'} />
+          <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={6} placeholder={EXAMPLES[P.sport]} />
           <div className="field-row">
             <button type="button" className="btn" onClick={addManual} disabled={!paste.trim()}>Add lines</button>
             {P.manual.length > 0 && <button type="button" className="btn-ghost" onClick={() => P.setManual([])}>Clear {P.manual.length} manual line{P.manual.length === 1 ? '' : 's'}</button>}
           </div>
           {msg && <ul className="form-msg">{msg.map((m, i) => <li key={i}>{m}</li>)}</ul>}
           <small className="muted">
-            Stats: pass yds, pass TDs, completions, attempts, INTs, pass+rush yds, rush yds, carries, receptions, rec yds, rush+rec yds.
+            Stats: {Object.values(P.marketsMap).map((m) => m.short).join(', ')}.
           </small>
         </div>
       </Card>

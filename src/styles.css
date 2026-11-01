@@ -776,3 +776,15 @@ code { font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 1px 5
   .prop-pick { min-width: 0; }
   .prop-detail { grid-template-columns: 1fr; }
 }
+
+/* ===== Sport switch ====================================================== */
+.sport-switch { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+.sport-switch button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 7px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; color: var(--text-3); transition: background 0.15s, color 0.15s; }
+.sport-switch button:hover { color: var(--text); }
+.sport-switch button.on { background: var(--surface-3); color: var(--text); }
+.sport-ico { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.sport-ico.nfl { width: 14px; height: 9px; background: #8b5a2b; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25); }
+.sport-ico.nba { background: radial-gradient(circle at 50% 50%, transparent 45%, rgba(0,0,0,0.35) 46%, transparent 52%), #f97316; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+.sport-switch button:not(.on) .sport-ico { filter: grayscale(0.6); opacity: 0.7; }
+@media (max-width: 1320px) { .nav span { display: none; } }
+@media (max-width: 860px) { .mobile-nav a span { font-size: 9px; } }

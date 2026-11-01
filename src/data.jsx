@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { getProjections, getScoreboard, getStandings, getState, getTeams, getWeekStats } from './api.js';
 import { buildSeason, rankDvp } from './model.js';
 
-const DataCtx = createContext(null);
+export const DataCtx = createContext(null);
 export const useData = () => useContext(DataCtx);
 
 const LIVE_POLL_MS = 60 * 1000;
@@ -139,12 +139,15 @@ export function DataProvider({ children }) {
   return <DataCtx.Provider value={value}>{children}</DataCtx.Provider>;
 }
 
-// Simple hash router: #/projections?pos=WR
+// Simple hash router: #/projections?pos=WR (NFL) or #/nba/projections (NBA)
 export function useRoute() {
   const parse = () => {
     const h = window.location.hash.replace(/^#\/?/, '');
-    const [path, qs] = h.split('?');
-    return { path: path || 'home', params: new URLSearchParams(qs || '') };
+    const [rawPath, qs] = h.split('?');
+    const parts = (rawPath || '').split('/').filter(Boolean);
+    const sport = parts[0] === 'nba' ? 'nba' : 'nfl';
+    if (sport === 'nba') parts.shift();
+    return { sport, path: parts[0] || 'home', params: new URLSearchParams(qs || '') };
   };
   const [route, setRoute] = useState(parse);
   useEffect(() => {
@@ -155,9 +158,9 @@ export function useRoute() {
   return route;
 }
 
-export function navigate(path, params) {
+export function navigate(path, params, sport = 'nfl') {
   const qs = params ? `?${new URLSearchParams(params)}` : '';
-  window.location.hash = `/${path}${qs}`;
+  window.location.hash = `/${sport === 'nba' ? 'nba/' : ''}${path}${qs}`;
 }
 
 export function usePersistentState(key, initial) {

@@ -1,0 +1,59 @@
+name: Refresh NFL data & deploy
+
+# Player stats and projections load live from Sleeper in the browser.
+# This workflow refreshes the ESPN snapshot (teams, standings, schedule, scores)
+# and redeploys the site to GitHub Pages.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'        # daily
+    - cron: '7,37 17-23 * * 0'  # Sunday game window (UTC), every 30 min
+    - cron: '7 0-5 * * 1'       # Sunday night / early Monday
+    - cron: '7 0-4 * * 2,5'     # Monday & Thursday night games
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Refresh ESPN snapshot
+        run: npm run data
+      - name: Commit snapshot if changed
+        run: |
+          if ! git diff --quiet -- public/data; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public/data
+            git commit -m "chore(data): refresh NFL snapshot [skip ci]"
+            git push
+          fi
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

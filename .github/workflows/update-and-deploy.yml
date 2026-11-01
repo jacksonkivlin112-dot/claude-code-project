@@ -2,7 +2,7 @@ name: Refresh NFL data & deploy
 
 # Player stats and projections load live from Sleeper in the browser.
 # This workflow refreshes the ESPN snapshot (teams, standings, schedule, scores)
-# and redeploys the site to GitHub Pages.
+# and PrizePicks lines (when the ODDS_API_KEY secret is set), then redeploys the site to GitHub Pages.
 on:
   push:
     branches: [main]
@@ -34,6 +34,12 @@ jobs:
       - run: npm ci
       - name: Refresh ESPN snapshot
         run: npm run data
+      - name: Refresh PrizePicks lines (needs ODDS_API_KEY secret)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          PROPS_MARKETS: ${{ vars.PROPS_MARKETS }}
+          PROPS_WITHIN_HOURS: ${{ vars.PROPS_WITHIN_HOURS }}
+        run: npm run props
       - name: Commit snapshot if changed
         run: |
           if ! git diff --quiet -- public/data; then

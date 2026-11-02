@@ -1,3 +1,4 @@
+import { SaveSlipButton } from '../components/Tracking.jsx';
 import { useMemo, useState } from 'react';
 import { CFGS, OWN_HOOK, SPORT_LABEL, useDualSports } from '../dualSport.jsx';
 import { americanOdds, hitDistribution } from '../slipMath.js';
@@ -162,6 +163,7 @@ function ParlayPage({ home, own }) {
               </ol>
               <footer className="pl-foot">
                 <button type="button" className="btn" onClick={() => analyze(pl)}>Full analysis in Slip Scan →</button>
+                <SaveSlipButton legs={pl.legs} title={`${pl.legs.length}-leg ${[...new Set(pl.legs.map((l) => SPORT_LABEL[l.sport]))].join(' + ')} parlay`} source="parlays" />
                 <button type="button" className="btn-ghost" onClick={() => copy(pl, i)}>{copied === i ? 'Copied ✓' : 'Copy picks'}</button>
               </footer>
             </article>

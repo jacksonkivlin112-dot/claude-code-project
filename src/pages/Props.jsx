@@ -4,6 +4,8 @@ import { MARKETS, SPORTS, fetchPrizePicksLines, listEvents, normName } from '../
 import { BREAKEVEN, buildLookups, evaluateProp, parseManual, probabilities } from '../propsModel.js';
 import { parseManualNba } from '../nba/props.js';
 import { useProjectionRows, useTeamOutlook } from '../components/players.jsx';
+import { SaveSlipButton } from '../components/Tracking.jsx';
+import { gradePicks, logPicks } from '../tracker.js';
 import { Avatar, Card, Empty, InjuryDot, PosBadge, Segmented, SkeletonRows, TeamLogo, WeeklyBars, f1, kickoff, timeAgo, useNow, useUi } from '../components/ui.jsx';
 
 const lsKeys = (sport) => {
@@ -66,7 +68,7 @@ function withMovement(props, LS) {
   return out;
 }
 
-function usePropLines(sport) {
+export function usePropLines(sport) {
   const LS = lsKeys(sport);
   const marketsMap = SPORTS[sport].markets;
   const [snapshot, setSnapshot] = useState(null); // {generatedAt, props} | false
@@ -133,6 +135,20 @@ function usePropLines(sport) {
 
 const GRADE_ORDER = { strong: 3, solid: 2, lean: 1, pass: 0 };
 
+/**
+ * Logs the model's open picks (graded PrizePicks lines + 75% highest-chance lines)
+ * for the record, and grades finished ones. Runs wherever the prop model is loaded.
+ */
+export function usePickLogger(cfg, ctx, rows, evaluated) {
+  const { season, liveById, gameByTeam } = useData();
+  const safe = useMemo(() => (ctx && rows ? buildSafePicks(cfg, ctx, rows, 0.75, gameByTeam) : []), [cfg, ctx, rows, gameByTeam]);
+  useEffect(() => {
+    if (!ctx || !evaluated) return;
+    logPicks(cfg.sport, { week: ctx.week, evaluated, safe, gameByTeam });
+    gradePicks(cfg.sport, { markets: cfg.markets, season, liveById, gameByTeam });
+  }, [ctx, evaluated, safe]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 /** NFL: projections, season logs and the team model feed the prop model. */
 export function useNflContext() {
   const { core, season, ranks, liveById, gameByTeam, teams } = useData();
@@ -148,8 +164,9 @@ export function useNflContext() {
       leagueAvg: outlook.leagueAvg,
       liveById,
       gameByTeam,
+      week: core?.week,
     };
-  }, [rows, outlook, season, ranks, liveById, gameByTeam, teams]);
+  }, [rows, outlook, season, ranks, liveById, gameByTeam, teams, core]);
   return { ctx, rows };
 }
 
@@ -180,6 +197,7 @@ function PropsBody({ ctx, rows, P }) {
   const [showStarted, setShowStarted] = useState(false);
 
   const evaluated = useMemo(() => (ctx ? P.lines.map((l) => cfg.evaluate(l, ctx)).filter(Boolean) : null), [ctx, P.lines, cfg]);
+  usePickLogger(cfg, ctx, rows, evaluated);
   const saveCheck = (c) => {
     const exists = P.manual.some((m) => normName(m.player) === normName(c.player) && m.market === c.market);
     P.setManual([...P.manual.filter((m) => !(normName(m.player) === normName(c.player) && m.market === c.market)), { player: c.player, market: c.market, line: Number(c.line), added: Date.now() }]);
@@ -250,13 +268,14 @@ function PropsBody({ ctx, rows, P }) {
                 <SlipBuilder
                   title="Safest slip from today’s lines"
                   subtitle="Highest-probability picks from the loaded lines, one per game"
-                  picks={open.filter((e) => e.grade.key === 'strong' || e.grade.key === 'solid').map((e) => ({ key: e.id, playerId: e.playerId, player: e.player, pos: e.pos, team: e.team, opp: e.opp, game: e.team && e.opp ? [e.team, e.opp].sort().join('-') : e.id, side: e.side, line: e.line, stat: e.marketShort, prob: e.prob }))}
+                  picks={open.filter((e) => e.grade.key === 'strong' || e.grade.key === 'solid').map((e) => ({ key: e.id, sport: cfg.sport, playerId: e.playerId, player: e.player, pos: e.pos, team: e.team, opp: e.opp, game: e.team && e.opp ? [e.team, e.opp].sort().join('-') : e.id, side: e.side, line: e.line, market: e.market, stat: e.marketShort, prob: e.prob, gameTime: e.commence || ctx.gameByTeam[e.team]?.date, gameId: ctx.gameByTeam[e.team]?.id, week: ctx.week }))}
                 />
               )}
 
               {graded.length > 0 && (
                 <div className="record-bar">
                   <span>Model record this {cfg.period} (graded picks):</span>
+                  <a className="link" href={`#/${cfg.sport === 'nba' ? 'nba/' : ''}record`}>Full record →</a>
                   <strong className={wins / graded.length >= BREAKEVEN ? 'pos-txt' : 'neg-txt'}>{wins}-{graded.length - wins}</strong>
                   <span className="muted">{Math.round((wins / graded.length) * 100)}% hit rate</span>
                 </div>
@@ -771,14 +790,22 @@ function PropSheet({ r, ctx, lines, onSave }) {
 
 const Z_UPPER = { 0.7: 0.5244, 0.75: 0.6745, 0.8: 0.8416 };
 
-function floorLine(M, mean, sd, target) {
-  if (M.dist === 'poisson' || (M.poissonBelow && mean < M.poissonBelow)) {
-    for (let k = Math.ceil(mean + 4 * Math.sqrt(mean + 1)); k >= 1; k--) {
-      if (probabilities('poisson', mean, 0, k - 0.5).over >= target) return k - 0.5;
-    }
-    return null;
-  }
-  return Math.floor(mean - Z_UPPER[target] * sd - 0.5) + 0.5;
+// Backtests on this season's games showed raw spreads are too tight: lines the model
+// rated 75% hit ~64%. Widening the spread by this factor brings hit rates back in line.
+export const SAFE_SD_MULT = 1.5;
+
+/**
+ * Highest line with at least `target` chance to go over, using a calibrated spread.
+ * Count stats (Poisson) use sqrt(mean) as their base spread. Returns { line, prob } or null.
+ */
+export function safeLine(M, mean, sd, target, mult = SAFE_SD_MULT) {
+  if (!(mean > 0)) return null;
+  const count = M.dist === 'poisson' || (M.poissonBelow && mean < M.poissonBelow);
+  const s = mult * (count ? Math.sqrt(mean) : sd);
+  if (!(s > 0)) return null;
+  const line = Math.floor(mean - Z_UPPER[target] * s - 0.5) + 0.5;
+  if (line < 0.5) return null;
+  return { line, prob: probabilities('normal', mean, s, line).over };
 }
 
 /**
@@ -795,22 +822,23 @@ export function buildSafePicks(cfg, ctx, rows, target, gameByTeam = {}) {
     for (const m of safe) {
       const base = cfg.evaluate({ id: `h0:${r.id}|${m}`, player: r.name, market: m, line: 0.5 }, ctx);
       if (!base || base.unmatched || !base.mean || base.games < 4) continue;
-      const line = floorLine(cfg.markets[m], base.mean, base.sd, target);
+      const cal = safeLine(cfg.markets[m], base.mean, base.sd, target);
+      const line = cal?.line;
       // Real PrizePicks lines sit near the projection; skip "safe" lines far below it.
       if (line == null || line < (cfg.minLine[m] ?? 0.5) || line / base.mean < 0.6) continue;
       const e = cfg.evaluate({ id: `h:${r.id}|${m}`, player: r.name, market: m, line }, ctx);
-      if (!e || e.pOver < target - 0.005 || !e.recent?.length) continue;
+      if (!e || !e.recent?.length) continue;
       const hits = e.recent.filter((h) => h.over).length;
       const hitRate = hits / e.recent.length;
       if (hitRate < 0.6) continue;
       const g = gameByTeam[r.team];
       out.push({
         key: `${cfg.sport}:${e.id}`, playerId: r.id, player: r.name, first: r.first, last: r.last, pos: r.pos, group: cfg.groupOf(r), team: r.team, opp: r.opp,
-        game: `${cfg.sport}:${g ? g.id : [r.team, r.opp].sort().join('-')}`, state: g?.state || 'pre', date: g?.date,
-        market: m, stat: cfg.markets[m].short, statLabel: cfg.markets[m].label, sport: cfg.sport, side: 'over', line, prob: e.pOver, mean: e.mean,
+        game: `${cfg.sport}:${g ? g.id : [r.team, r.opp].sort().join('-')}`, state: g?.state || 'pre', date: g?.date, gameTime: g?.date, gameId: g?.id, week: ctx.week,
+        market: m, stat: cfg.markets[m].short, statLabel: cfg.markets[m].label, sport: cfg.sport, side: 'over', line, prob: cal.prob, rawProb: e.pOver, mean: e.mean,
         hits, n: e.recent.length, recent: e.recent, cushion: line / e.mean, actual: e.result?.actual, matchup: e.matchup, injury: e.injury,
         // Rank: consistency first, then how realistic (close to the projection) the line is, then model chance.
-        score: 0.45 * hitRate + 0.35 * Math.min(1, line / e.mean) + 0.2 * e.pOver,
+        score: 0.45 * hitRate + 0.35 * Math.min(1, line / e.mean) + 0.2 * cal.prob,
       });
     }
   }
@@ -902,6 +930,7 @@ function HighChance({ ctx, rows, onSave }) {
 
 /** Builds a 2–6 leg entry from the highest-probability picks, max one per game. */
 function SlipBuilder({ title, subtitle, picks }) {
+  const cfg = useCfg();
   const [size, setSize] = useState(3);
   const legs = [];
   const used = new Set();
@@ -935,6 +964,7 @@ function SlipBuilder({ title, subtitle, picks }) {
         <span>All {legs.length} hit (model estimate)</span>
         <strong>{Math.round(combined * 100)}%</strong>
       </div>
+      <SaveSlipButton legs={legs} title={`${legs.length}-pick ${cfg.sport.toUpperCase()} slip`} source="builder" />
       {legs.length < size && <p className="muted small">Only {legs.length} games have a qualifying pick right now.</p>}
       <p className="muted small slip-note">Each leg is a separate estimate. Real results vary, so play only what you can afford to lose.</p>
     </div>

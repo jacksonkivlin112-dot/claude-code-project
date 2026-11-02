@@ -11,9 +11,11 @@ const NBA_NAV = [
   { path: 'props', label: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
   { path: 'scan', label: 'Slip Scan', short: 'Scan', icon: 'M3 7h3l2-3h8l2 3h3v13H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
   { path: 'parlays', label: 'Parlay Builder', short: 'Parlays', icon: 'M4 6h11M4 12h8M4 18h11M18 5l3 3-3 3M18 13l3 3-3 3' },
+  { path: 'slips', label: 'My Slips', short: 'Slips', icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3' },
+  { path: 'record', label: 'Pick Record', short: 'Record', icon: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4' },
   { path: 'stats', label: 'Season Stats', short: 'Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
-  { path: 'teams', label: 'Teams', icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
-  { path: 'matchups', label: 'Matchups', icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
+  { path: 'teams', label: 'Teams', menuOnly: true, icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
+  { path: 'matchups', label: 'Matchups', menuOnly: true, icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
 ];
 
 const navFor = (sport) => (sport === 'nba' ? NBA_NAV : NAV);
@@ -25,9 +27,11 @@ const NAV = [
   { path: 'props', label: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
   { path: 'scan', label: 'Slip Scan', short: 'Scan', icon: 'M3 7h3l2-3h8l2 3h3v13H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
   { path: 'parlays', label: 'Parlay Builder', short: 'Parlays', icon: 'M4 6h11M4 12h8M4 18h11M18 5l3 3-3 3M18 13l3 3-3 3' },
+  { path: 'slips', label: 'My Slips', short: 'Slips', icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3' },
+  { path: 'record', label: 'Pick Record', short: 'Record', icon: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4' },
   { path: 'stats', label: 'Season Stats', short: 'Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
-  { path: 'teams', label: 'Teams', icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
-  { path: 'matchups', label: 'Matchups', icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
+  { path: 'teams', label: 'Teams', menuOnly: true, icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
+  { path: 'matchups', label: 'Matchups', menuOnly: true, icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
 ];
 
 export function Icon({ d, size = 18 }) {
@@ -44,7 +48,7 @@ function useTheme() {
   });
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#06070f' : '#f6f5ff');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#000000' : '#f6f5ff');
     try { localStorage.setItem('ge:pref:theme', theme); } catch { /* ignore */ }
   }, [theme]);
   return [theme, setTheme];
@@ -100,7 +104,7 @@ export function Header({ route }) {
           </span>
         )}
         <nav className="nav" aria-label="Primary">
-          {nav.map((n) => (
+          {nav.filter((n) => !n.menuOnly).map((n) => (
             <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''} aria-current={route.path === n.path ? 'page' : undefined} title={n.label}>
               <Icon d={n.icon} size={16} />
               <span>{n.short || n.label}</span>
@@ -141,6 +145,7 @@ export function Header({ route }) {
                 </a>
               ))}
             </nav>
+            <InstallApp />
             {setFmt && (
               <div className="menu-row">
                 <span>Fantasy scoring</span>
@@ -152,6 +157,53 @@ export function Header({ route }) {
         document.body,
       )}
     </header>
+  );
+}
+
+const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+/** Install-to-home-screen: the browser prompt where supported, instructions on iPhone. */
+function InstallApp() {
+  const [can, setCan] = useState(() => !!window.__installPrompt);
+  const [help, setHelp] = useState(false);
+  useEffect(() => {
+    const on = () => setCan(true);
+    window.addEventListener('ge:installable', on);
+    return () => window.removeEventListener('ge:installable', on);
+  }, []);
+  if (isStandalone()) return null;
+  const install = async () => {
+    if (window.__installPrompt) {
+      window.__installPrompt.prompt();
+      await window.__installPrompt.userChoice.catch(() => {});
+      window.__installPrompt = null;
+      setCan(false);
+    } else setHelp((h) => !h);
+  };
+  return (
+    <div className="install">
+      <button type="button" className="install-btn" onClick={install}>
+        <img src="./icon-192.png" alt="" width="36" height="36" />
+        <span><strong>Install the app</strong><small>{can ? 'Full screen, home-screen icon, alerts' : 'Add Gridiron Edge to your home screen'}</small></span>
+      </button>
+      {help && (
+        <ol className="install-help">
+          {isIos() ? (
+            <>
+              <li>Open this page in <b>Safari</b>.</li>
+              <li>Tap the <b>Share</b> button <span aria-hidden>⬆︎</span>.</li>
+              <li>Choose <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+            </>
+          ) : (
+            <>
+              <li>Open your browser menu (<b>⋮</b>).</li>
+              <li>Choose <b>Install app</b> or <b>Add to Home screen</b>.</li>
+            </>
+          )}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -172,7 +224,7 @@ function LeagueTabs({ route, anyLive }) {
   );
 }
 
-const DOCK = ['home', 'props', 'parlays', 'scan', 'projections'];
+const DOCK = ['home', 'props', 'parlays', 'scan', 'slips'];
 
 /** Floating rounded bottom bar with the main sections, plus a separate search button. */
 export function MobileNav({ route }) {

@@ -7,7 +7,8 @@ import { parseNbaSummary } from '../gamecast.js';
 import { buildFeed } from '../../liveFeed.js';
 import LiveFeed from '../../components/LiveFeed.jsx';
 import GameTabs from '../../components/GameTabs.jsx';
-import { FlatScore, GameSwitcher } from '../../components/GameHeader.jsx';
+import GameProps from '../../components/GameProps.jsx';
+import { FlatScore, GameSwitcher, useSwipeGames } from '../../components/GameHeader.jsx';
 
 const LIVE_MS = 10000;
 const IDLE_MS = 60000;
@@ -59,6 +60,7 @@ export default function NbaGame({ params }) {
   const { board, teams } = useData();
   const { game, error, fetchedAt } = useNbaGame(id);
   const [tab, setTab] = useState('feed');
+  const swipe = useSwipeGames(id, 'nba');
   useNow(5000);
   const fallback = board.games.find((g) => g.id === id);
 
@@ -87,15 +89,16 @@ export default function NbaGame({ params }) {
   };
 
   return (
-    <div className="page game-page">
+    <div className="page game-page" {...swipe}>
       <div className="game-dock">
         <GameSwitcher currentId={game.id} sport="nba" back="#/nba/home" />
-        <FlatScore game={game} wp={game.winprob.length ? game.winprob[game.winprob.length - 1].home : null} />
-        <GameTabs value={tab} onChange={setTab} tabs={[{ value: 'feed', label: 'Feed' }, { value: 'box', label: 'Box score' }, { value: 'stats', label: 'Stats' }, { value: 'fantasy', label: 'Fantasy' }]} />
+        <FlatScore sport="nba" game={game} wp={game.winprob.length ? game.winprob[game.winprob.length - 1].home : null} />
+        <GameTabs value={tab} onChange={setTab} tabs={[{ value: 'feed', label: 'Feed' }, { value: 'box', label: 'Box score' }, { value: 'props', label: 'Props' }, { value: 'stats', label: 'Stats' }, { value: 'fantasy', label: 'Fantasy' }]} />
       </div>
 
       {tab === 'feed' && <LiveFeed feed={game.feed} game={game} color={color} sport="nba" />}
       {tab === 'box' && <BoxScore game={game} />}
+      {tab === 'props' && <GameProps game={game} sport="nba" />}
       {tab === 'stats' && (
         <div className="stats-stack">
           {game.winprob.length > 1 && <WinProbChart game={game} color={color} />}

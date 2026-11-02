@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSnapshot } from '../api.js';
 import { useData } from '../data.jsx';
+import { favoriteRank, useFavorites } from '../favorites.js';
 import { computeStreaks, injuryReport, topPerformers } from '../insights.js';
 import { addDays, etDate } from '../nba/api.js';
 import { Avatar, TeamLogo, useUi } from './ui.jsx';
@@ -82,7 +83,8 @@ export function GamesSection({ games, sport, spreadOf, onStandings }) {
   const { teams } = useData();
   const href = (id) => `#/${sport === 'nba' ? 'nba/' : ''}game?id=${id}`;
   const order = { in: 0, pre: 1, post: 2 };
-  const list = [...games].sort((a, b) => order[a.state] - order[b.state] || new Date(a.date) - new Date(b.date));
+  const [favs] = useFavorites(sport);
+  const list = [...games].sort((a, b) => order[a.state] - order[b.state] || favoriteRank(b, favs) - favoriteRank(a, favs) || new Date(a.date) - new Date(b.date));
   return (
     <section className="hs">
       <SectionHead title="Games" more="Standings" onMore={onStandings} />
@@ -91,7 +93,7 @@ export function GamesSection({ games, sport, spreadOf, onStandings }) {
           {list.map((g) => {
             const spread = spreadOf?.(g);
             return (
-              <a key={g.id} href={href(g.id)} className={`gs-card ${g.state}`}>
+              <a key={g.id} href={href(g.id)} className={`gs-card ${g.state} ${favoriteRank(g, favs) ? 'fav' : ''}`}>
                 <span className="gs-teams">
                   {[g.away, g.home].map((t) => (
                     <span key={t.abbr} className={`gs-team ${g.state === 'post' && !t.winner ? 'lost' : ''}`}>

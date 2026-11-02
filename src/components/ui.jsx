@@ -50,7 +50,7 @@ export function UiProvider({ children }) {
 
 // ---- atoms ----------------------------------------------------------------
 
-export function TeamLogo({ abbr, size = 24, className = '' }) {
+export function TeamLogo({ abbr, size = 24, className = '', eager = false }) {
   const { teams } = useData();
   const t = teams?.[abbr];
   const [err, setErr] = useState(false);
@@ -61,7 +61,7 @@ export function TeamLogo({ abbr, size = 24, className = '' }) {
       </span>
     );
   }
-  return <img className={`team-logo ${className}`} src={t.logo} alt={`${t.name} logo`} width={size} height={size} loading="lazy" onError={() => setErr(true)} />;
+  return <img className={`team-logo ${className}`} src={t.logo} alt={`${t.name} logo`} width={size} height={size} loading={eager ? 'eager' : 'lazy'} onError={() => setErr(true)} />;
 }
 
 export function TeamChip({ abbr, size = 20, showName = false }) {

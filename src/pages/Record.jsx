@@ -45,7 +45,7 @@ function RecordPage({ sport }) {
       </div>
 
       <div className="rec-tiles">
-        <Tile title="PrizePicks line picks" sub="Strong, Solid & Lean picks on real lines" t={sum.lines} target={sum.breakeven} targetLabel={`${pct(sum.breakeven)} needed to profit`} />
+        <Tile title="Real-line picks" sub="Strong, Solid & Lean picks on DraftKings / PrizePicks lines" t={sum.lines} target={sum.breakeven} targetLabel={`${pct(sum.breakeven)} needed to profit`} />
         <Tile title="Highest-chance picks" sub="The model’s 75%+ floor lines" t={sum.safe} target={sum.safe.expected} targetLabel={sum.safe.expected != null ? `model expected ${pct(sum.safe.expected)}` : 'model expects 75%+'} />
         <div className="rec-tile">
           <span className="rec-tile-title">Waiting on games</span>
@@ -107,7 +107,7 @@ function RecordPage({ sport }) {
               ))}
             </div>
             <p className="muted small">
-              Rebuilds each pick from form alone: recent and season averages, spread, the same floor-line rule and the same “cleared it in most recent games” filter, best stat per player. The live model adds matchup, injury and game-script inputs this replay can’t recreate, so treat this as a baseline. PrizePicks lines aren’t archived, so picks on real lines can only be judged by the live record above.
+              Rebuilds each pick from form alone: recent and season averages, spread, the same floor-line rule and the same “cleared it in most recent games” filter, best stat per player. The live model adds matchup, injury and game-script inputs this replay can’t recreate, so treat this as a baseline. Past sportsbook lines aren’t archived, so picks on real lines can only be judged by the live record above.
             </p>
             <div className="bt-stats">
               {backtest[1].byStat.map((s) => <span key={s.stat}>{s.stat} <b>{pct(s.hits / s.n)}</b> <small>({s.n})</small></span>)}

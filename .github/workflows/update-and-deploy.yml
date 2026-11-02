@@ -38,6 +38,8 @@ jobs:
         run: npm run data
       - name: Refresh NBA ESPN snapshot
         run: npm run data:nba
+      - name: Refresh sportsbook prop lines (DraftKings via ESPN, free)
+        run: npm run lines && npm run lines:nba
       - name: Refresh PrizePicks lines (needs ODDS_API_KEY secret)
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}

@@ -32,7 +32,7 @@ function liveSt(actual, line, side, game, frac) {
   return { state: 'live', actual, proj, onPace: proj == null ? side === 'under' : side === 'over' ? proj > line : proj < line };
 }
 
-/** Props for this game: your saved legs, graded PrizePicks lines and the model's highest-chance lines, all live. */
+/** Props for this game: your saved legs, graded sportsbook/PrizePicks lines and the model's highest-chance lines, all live. */
 export default function GameProps({ game, sport }) {
   const cfg = CFGS[sport];
   const { ctx, rows } = OWN_HOOK[sport]();
@@ -77,13 +77,13 @@ export default function GameProps({ game, sport }) {
       )}
 
       <section>
-        <h3 className="gp-h">PrizePicks lines <small>{lines.length ? 'model pick on each line' : ''}</small></h3>
+        <h3 className="gp-h">Player prop lines <small>{lines.length ? `${[...new Set(lines.map((e) => e.book).filter(Boolean))].join(' + ')} · model pick on each` : ''}</small></h3>
         {lines.length === 0 ? (
-          <p className="muted small gp-empty">{P.lines.length ? 'No graded lines for this game right now.' : 'No PrizePicks lines are loaded. Add a source on the Props page, or use the model lines below.'}</p>
+          <p className="muted small gp-empty">{P.lines.length ? 'No graded lines for this game right now.' : 'No lines posted for this game yet. Sportsbooks usually post player props a day or two before kickoff/tip-off.'}</p>
         ) : (
           <ol className="gp-list">
             {lines.map((e) => (
-              <Row key={e.id} sport={sport} p={{ playerId: e.playerId, player: e.player, team: e.team, side: e.side, line: e.line, stat: e.marketShort, prob: e.prob, grade: e.grade }} st={liveSt(e.result?.actual ?? liveOf(e.playerId, e.market), e.line, e.side, game, frac)} />
+              <Row key={e.id} sport={sport} p={{ playerId: e.playerId, player: e.player, team: e.team, side: e.side, line: e.line, stat: e.marketShort, prob: e.prob, grade: e.grade, sub: e.book }} st={liveSt(e.result?.actual ?? liveOf(e.playerId, e.market), e.line, e.side, game, frac)} />
             ))}
           </ol>
         )}

@@ -10,7 +10,9 @@
     "data": "node scripts/fetch-espn.mjs",
     "props": "node scripts/fetch-props.mjs",
     "data:nba": "node scripts/fetch-espn-nba.mjs",
-    "props:nba": "node scripts/fetch-props.mjs nba"
+    "props:nba": "node scripts/fetch-props.mjs nba",
+    "lines": "node scripts/fetch-espn-lines.mjs nfl",
+    "lines:nba": "node scripts/fetch-espn-lines.mjs nba"
   },
   "dependencies": {
     "react": "^18.3.1",

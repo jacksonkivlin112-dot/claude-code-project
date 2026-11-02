@@ -18,7 +18,7 @@ export const NBA_CFG = {
   boardMinProj: 5,
   safeMinProj: 15,
   period: 'slate',
-  title: 'NBA PrizePicks Over / Under',
+  title: 'NBA Player Props · Over / Under',
   example: 'Nikola Jokic, Points, 27.5\nVictor Wembanyama Rebounds 11.5\nTyrese Maxey, PRA, 35.5',
   searchHint: 'Search any player or team (e.g. Jokic, Wemby, LAL)',
   keyMarkets: {

@@ -9,6 +9,8 @@ import Projections from './pages/Projections.jsx';
 import Props from './pages/Props.jsx';
 import Scan from './pages/Scan.jsx';
 import Parlays from './pages/Parlays.jsx';
+import Record, { NbaRecordRoute } from './pages/Record.jsx';
+import Slips, { NbaSlipsRoute } from './pages/Slips.jsx';
 import Stats from './pages/Stats.jsx';
 import Teams from './pages/Teams.jsx';
 import { NbaPlayerPanel, NbaTeamPanel } from './nba/components.jsx';
@@ -26,14 +28,14 @@ import NbaTeams from './nba/pages/Teams.jsx';
 const SPORTS = {
   nfl: {
     Provider: DataProvider,
-    pages: { home: Home, game: Game, projections: Projections, props: Props, scan: Scan, parlays: Parlays, stats: Stats, teams: Teams, matchups: Matchups },
+    pages: { home: Home, game: Game, projections: Projections, props: Props, scan: Scan, parlays: Parlays, slips: Slips, record: Record, stats: Stats, teams: Teams, matchups: Matchups },
     panels: {},
     credit: 'Stats & projections via Sleeper · Scores, standings & logos via ESPN',
     footer: (core) => (core ? `${core.season} season · data refreshes automatically each week` : ''),
   },
   nba: {
     Provider: NbaDataProvider,
-    pages: { home: NbaHome, game: NbaGame, projections: NbaProjections, props: NbaProps, scan: NbaScan, parlays: NbaParlays, stats: NbaStats, teams: NbaTeams, matchups: NbaMatchups },
+    pages: { home: NbaHome, game: NbaGame, projections: NbaProjections, props: NbaProps, scan: NbaScan, parlays: NbaParlays, slips: NbaSlipsRoute, record: NbaRecordRoute, stats: NbaStats, teams: NbaTeams, matchups: NbaMatchups },
     panels: { PlayerPanelC: NbaPlayerPanel, TeamPanelC: NbaTeamPanel },
     credit: 'Box scores & projections via Sleeper · Scores, standings & logos via ESPN',
     footer: (core) => (core ? `${core.label} season · data refreshes automatically every night` : ''),

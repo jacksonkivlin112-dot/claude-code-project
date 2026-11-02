@@ -5,6 +5,7 @@ import { normName } from '../oddsapi.js';
 import { BREAKEVEN } from '../propsModel.js';
 import { parseSlipText } from '../slipParse.js';
 import { PAYOUTS, americanOdds, breakEvenFlex, breakEvenPower, evFlex, evPower, hitDistribution, kelly, quantiles } from '../slipMath.js';
+import { SaveSlipButton } from '../components/Tracking.jsx';
 import { Avatar, Card, Empty, Segmented, SkeletonRows, TeamLogo, f1, kickoff, useUi } from '../components/ui.jsx';
 import { NFL_CFG, useNflContext } from './Props.jsx';
 
@@ -215,6 +216,14 @@ function ScanPage({ home, own }) {
       ) : (
         <>
           <SlipSummary legs={valid} stake={stake} setStake={setStake} mode={mode} setMode={setMode} power={power} flex={flex} />
+          <div className="scan-save">
+            <SaveSlipButton
+              className="btn"
+              title={`Scanned ${valid.length}-pick slip`}
+              source="scan"
+              legs={valid.map((a) => ({ sport: a.sport, playerId: a.e.playerId, player: a.e.player, team: a.e.team, opp: a.e.opp, market: a.leg.market, stat: a.e.marketShort, line: Number(a.leg.line), side: a.leg.side || 'over', prob: a.prob, gameTime: a.e.commence || a.ctx.gameByTeam?.[a.e.team]?.date, gameId: a.ctx.gameByTeam?.[a.e.team]?.id, week: a.ctx.week }))}
+            />
+          </div>
           <PayoutAssumptions power={power} setPower={setPower} flex={flex} setFlex={setFlex} />
           <div className="section-head"><h2>Leg-by-leg breakdown</h2><span className="muted small">Every number the model uses for each pick</span></div>
           <div className="leg-cards">

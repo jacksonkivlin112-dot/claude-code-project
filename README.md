@@ -66,3 +66,10 @@ The NBA side (`#/nba/...`) has the same features, built around nightly slates:
 - **Season Stats**, **Teams** (rankings for the night plus conference standings with playoff and Play-In zones), **Matchups** (defense-vs-position heatmap by stat) and a live **Game Center** with play-by-play, box score, win probability and live fantasy points.
 
 Data: Sleeper NBA season totals, per-game box scores and per-game projections, plus `public/data/nba/espn.json` (`npm run data:nba`). NBA PrizePicks lines come from `npm run props:nba`, which uses the same `ODDS_API_KEY`.
+
+## Pick record, saved slips & installable app
+
+- **Pick Record** (`#/record`, `#/nba/record`): every pick the model makes (graded PrizePicks lines and the 75% highest-chance lines) is logged before its game and graded from the box score afterward. Shows records by grade and stat, a calibration chart, and a leak-free backtest of the highest-chance method. Stored on the device.
+- **Calibration**: the backtest showed raw spreads were too tight (75% lines hit ~64%), so highest-chance lines now use a 1.5× spread (`SAFE_SD_MULT`), which brings replayed hit rates back to target.
+- **My Slips** (`#/slips`): save any slip from Props, the Parlay Builder or Slip Scan and follow each leg live, with optional alerts.
+- **Install**: web app manifest + service worker; "Install the app" lives in the menu.

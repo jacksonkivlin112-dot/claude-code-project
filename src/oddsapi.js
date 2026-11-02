@@ -83,6 +83,12 @@ export async function listEvents(apiKey, fetchImpl = fetch, sport = 'nfl') {
   return body;
 }
 
+/** Upcoming events plus the account's credit counters (free call). */
+export async function listEventsWithQuota(apiKey, fetchImpl = fetch, sport = 'nfl') {
+  const r = await get(`${ODDS_BASE}/sports/${SPORTS[sport].key}/events?apiKey=${encodeURIComponent(apiKey)}&dateFormat=iso`, fetchImpl);
+  return { events: r.body, remaining: r.remaining != null ? Number(r.remaining) : null, used: r.used != null ? Number(r.used) : null };
+}
+
 /**
  * Fetch PrizePicks lines for the given events.
  * Cost: 1 credit per market per event that returns data.

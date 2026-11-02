@@ -120,7 +120,6 @@ export default function Props() {
     };
   }, [rows, outlook, season, ranks, liveById, gameByTeam, teams]);
   const evaluated = useMemo(() => (ctx ? P.lines.map((l) => evaluateProp(l, ctx)).filter(Boolean) : null), [ctx, P.lines]);
-  const [check, setCheck] = useState({ player: '', market: 'player_pass_yds', line: '' });
   const saveCheck = (c) => {
     const exists = P.manual.some((m) => normName(m.player) === normName(c.player) && m.market === c.market);
     P.setManual([...P.manual.filter((m) => !(normName(m.player) === normName(c.player) && m.market === c.market)), { player: c.player, market: c.market, line: Number(c.line), added: Date.now() }]);
@@ -173,61 +172,62 @@ export default function Props() {
 
       {showSettings && <SourceSettings P={P} rows={rows} />}
 
-      {ctx && <QuickCheck ctx={ctx} rows={rows} value={check} onChange={setCheck} onSave={saveCheck} />}
-
       {!evaluated || !P.snapshotLoaded ? (
         <Card><SkeletonRows n={6} h={64} /></Card>
-      ) : P.lines.length === 0 ? (
-        <>
-          <ModelBoard ctx={ctx} rows={rows} onPick={(player, mkt, mean) => { setCheck({ player, market: mkt, line: String(Math.round(mean * 2) / 2) }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
-          <NoLines onSetup={() => setShowSettings(true)} />
-        </>
       ) : (
         <>
-          {best.length > 0 && (
-            <section>
-              <div className="section-head"><h2>Best plays</h2><span className="muted small">Highest model confidence among open lines</span></div>
-              <div className="best-grid">{best.map((e) => <BestCard key={e.id} e={e} />)}</div>
-            </section>
+          {P.lines.length > 0 && (
+            <>
+              {best.length > 0 && (
+                <section>
+                  <div className="section-head"><h2>Best plays</h2><span className="muted small">Highest model confidence among open lines</span></div>
+                  <div className="best-grid">{best.map((e) => <BestCard key={e.id} e={e} />)}</div>
+                </section>
+              )}
+
+              {graded.length > 0 && (
+                <div className="record-bar">
+                  <span>Model record this week (graded picks):</span>
+                  <strong className={wins / graded.length >= BREAKEVEN ? 'pos-txt' : 'neg-txt'}>{wins}-{graded.length - wins}</strong>
+                  <span className="muted">{Math.round((wins / graded.length) * 100)}% hit rate</span>
+                </div>
+              )}
+
+              <div className="section-head"><h2>{P.source ? 'PrizePicks lines' : 'Your saved lines'}</h2><span className="muted small">{evaluated.length} line{evaluated.length === 1 ? '' : 's'}</span></div>
+              <div className="toolbar">
+                <select value={market} onChange={(e) => setMarket(e.target.value)} aria-label="Stat type">
+                  <option value="ALL">All stats</option>
+                  {marketsPresent.map((m) => <option key={m} value={m}>{MARKETS[m].label}</option>)}
+                </select>
+                <Segmented options={['ALL', 'OVER', 'UNDER']} value={side} onChange={setSide} label="Pick side" />
+                <select value={minGrade} onChange={(e) => setMinGrade(e.target.value)} aria-label="Minimum confidence">
+                  <option value="pass">All lines</option>
+                  <option value="lean">Lean or better</option>
+                  <option value="solid">Solid or better</option>
+                  <option value="strong">Strong only</option>
+                </select>
+                <div className="search">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+                  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player or team" aria-label="Search lines" />
+                </div>
+                <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+                  <option value="prob">Sort: confidence</option>
+                  <option value="edge">Sort: gap vs line</option>
+                  <option value="time">Sort: kickoff</option>
+                </select>
+                <label className="check"><input type="checkbox" checked={showStarted} onChange={(e) => setShowStarted(e.target.checked)} /> Include started games</label>
+              </div>
+              {filtered.length === 0 ? (
+                <Card><Empty title="No lines match these filters">Try “All lines”, another stat, or include started games.</Empty></Card>
+              ) : (
+                <div className="props-list">{filtered.map((e) => <PropRow key={e.id} e={e} />)}</div>
+              )}
+            </>
           )}
 
-          {graded.length > 0 && (
-            <div className="record-bar">
-              <span>Model record this week (graded picks):</span>
-              <strong className={wins / graded.length >= BREAKEVEN ? 'pos-txt' : 'neg-txt'}>{wins}-{graded.length - wins}</strong>
-              <span className="muted">{Math.round((wins / graded.length) * 100)}% hit rate</span>
-            </div>
-          )}
+          <PlayerBoard ctx={ctx} rows={rows} feed={evaluated} manual={P.manual} onSave={saveCheck} />
 
-          <div className="toolbar">
-            <select value={market} onChange={(e) => setMarket(e.target.value)} aria-label="Stat type">
-              <option value="ALL">All stats</option>
-              {marketsPresent.map((m) => <option key={m} value={m}>{MARKETS[m].label}</option>)}
-            </select>
-            <Segmented options={['ALL', 'OVER', 'UNDER']} value={side} onChange={setSide} label="Pick side" />
-            <select value={minGrade} onChange={(e) => setMinGrade(e.target.value)} aria-label="Minimum confidence">
-              <option value="pass">All lines</option>
-              <option value="lean">Lean or better</option>
-              <option value="solid">Solid or better</option>
-              <option value="strong">Strong only</option>
-            </select>
-            <div className="search">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player or team" aria-label="Search props" />
-            </div>
-            <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
-              <option value="prob">Sort: confidence</option>
-              <option value="edge">Sort: gap vs line</option>
-              <option value="time">Sort: kickoff</option>
-            </select>
-            <label className="check"><input type="checkbox" checked={showStarted} onChange={(e) => setShowStarted(e.target.checked)} /> Include started games</label>
-          </div>
-
-          {filtered.length === 0 ? (
-            <Card><Empty title="No props match these filters">Try “All lines” or another stat type.</Empty></Card>
-          ) : (
-            <div className="props-list">{filtered.map((e) => <PropRow key={e.id} e={e} />)}</div>
-          )}
+          {P.lines.length === 0 && <NoLines onSetup={() => setShowSettings(true)} />}
         </>
       )}
 
@@ -407,7 +407,7 @@ function NoLines({ onSetup }) {
     <Card>
       <div className="nolines">
         <Empty title="Want every PrizePicks line graded automatically?">
-          Use <strong>Check a line</strong> above for any single prop. To load and grade the full PrizePicks board on its own, connect a free The Odds API key. PrizePicks has no public feed, and this source carries its lines.
+          Use <strong>All player props</strong> above to check any player and stat. To load and grade the full PrizePicks board on its own, connect a free The Odds API key. PrizePicks has no public feed, and this source carries its lines.
         </Empty>
         <ol className="steps">
           <li><strong>Site-wide (recommended):</strong> add an <code>ODDS_API_KEY</code> repository secret. The scheduled GitHub Action then refreshes lines for everyone.</li>
@@ -503,74 +503,92 @@ function SourceSettings({ P, rows }) {
   );
 }
 
-// ---- Check a line (works with no API key) ----------------------------------
+// ---- All players board (works with no API key) ------------------------------
 
 const BAD_STATUS = ['Out', 'IR', 'Doubtful', 'PUP', 'Sus'];
+const SKILL = ['QB', 'RB', 'WR', 'TE'];
+const KEY_MARKETS = {
+  QB: ['player_pass_yds', 'player_pass_tds', 'player_rush_yds'],
+  RB: ['player_rush_yds', 'player_receptions', 'player_rush_reception_yds'],
+  WR: ['player_receptions', 'player_reception_yds'],
+  TE: ['player_receptions', 'player_reception_yds'],
+};
+const PAGE = 40;
+const clean = (t) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 
-function QuickCheck({ ctx, rows, value, onChange, onSave }) {
-  const [saved, setSaved] = useState(null);
-  const names = useMemo(() => (rows || []).filter((r) => r.pos !== 'K' && r.pos !== 'DEF').map((r) => r.name), [rows]);
-  const player = (rows || []).find((r) => normName(r.name) === normName(value.player));
-  const markets = Object.entries(MARKETS).filter(([, m]) => !player || m.pos.includes(player.pos));
-  const market = markets.some(([k]) => k === value.market) ? value.market : markets[0]?.[0];
-  const hint = useMemo(() => (player && market ? evaluateProp({ id: 'hint', player: player.name, market, line: 0.5 }, ctx) : null), [player, market, ctx]);
-  const lineNum = parseFloat(value.line);
-  const result = useMemo(
-    () => (player && market && Number.isFinite(lineNum) && lineNum >= 0 ? evaluateProp({ id: `q:${player.id}|${market}`, player: player.name, market, line: lineNum }, ctx) : null),
-    [player, market, lineNum, ctx],
-  );
-  const set = (patch) => { setSaved(null); onChange({ ...value, market, ...patch }); };
+function PlayerBoard({ ctx, rows, feed, manual, onSave }) {
+  const { gameByTeam } = useData();
+  const [q, setQ] = useState('');
+  const [pos, setPos] = useState('ALL');
+  const [team, setTeam] = useState('ALL');
+  const [sort, setSort] = useState('proj');
+  const [hideStarted, setHideStarted] = useState(false);
+  const [limit, setLimit] = useState(PAGE);
+  const [openId, setOpenId] = useState(null);
+
+  // PrizePicks / saved lines keyed by player, then market.
+  const linesByPlayer = useMemo(() => {
+    const m = {};
+    for (const e of feed || []) ((m[normName(e.player)] ||= {})[e.market] = { line: e.line, source: e.manual ? 'saved' : 'prizepicks' });
+    for (const x of manual || []) ((m[normName(x.player)] ||= {})[x.market] ||= { line: x.line, source: 'saved' });
+    return m;
+  }, [feed, manual]);
+
+  const players = useMemo(() => (rows || []).filter((r) => SKILL.includes(r.pos) && r.proj >= 0.5), [rows]);
+  const teams = useMemo(() => [...new Set(players.map((r) => r.team))].sort(), [players]);
+  const list = useMemo(() => {
+    const tokens = clean(q).split(' ').filter(Boolean);
+    const out = players.filter((r) => {
+      if (pos !== 'ALL' && r.pos !== pos) return false;
+      if (team !== 'ALL' && r.team !== team) return false;
+      if (hideStarted && gameByTeam[r.team] && gameByTeam[r.team].state !== 'pre') return false;
+      if (!tokens.length) return true;
+      const hay = `${clean(r.name)} ${r.team.toLowerCase()} ${r.pos.toLowerCase()}`;
+      return tokens.every((t) => hay.includes(t));
+    });
+    const key = { proj: (r) => -r.proj, name: (r) => r.last, team: (r) => r.team + String(1000 - r.proj).padStart(6, '0') }[sort];
+    return out.sort((a, b) => { const x = key(a); const y = key(b); return typeof x === 'string' ? x.localeCompare(y) : x - y; });
+  }, [players, q, pos, team, sort, hideStarted, gameByTeam]);
+
+  useEffect(() => setLimit(PAGE), [q, pos, team, sort, hideStarted]);
+  if (!ctx) return null;
 
   return (
-    <section className="qc">
-      <div className="qc-head">
+    <section className="pboard">
+      <div className="pboard-head">
         <div>
-          <h2 className="qc-title">Check a line</h2>
-          <p className="muted small">Type the player and the number you see on PrizePicks. The model returns More or Less instantly, no setup needed.</p>
+          <h2 className="qc-title">All player props</h2>
+          <p className="muted small">Every player with a projection this week. Search anyone, tap them, and type the PrizePicks line for any stat to get an instant More or Less.</p>
         </div>
+        <span className="pboard-count">{list.length} <small>of {players.length} players</small></span>
       </div>
-      <div className="qc-form">
-        <label className="qc-field grow">
-          <span>Player</span>
-          <input id="qc-player" list="qc-names" value={value.player} onChange={(e) => set({ player: e.target.value })} placeholder="e.g. Josh Allen" autoComplete="off" />
-          <datalist id="qc-names">{names.map((n) => <option key={n} value={n} />)}</datalist>
-        </label>
-        <label className="qc-field">
-          <span>Stat</span>
-          <select id="qc-market" value={market} onChange={(e) => set({ market: e.target.value })}>
-            {markets.map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-          </select>
-        </label>
-        <label className="qc-field small">
-          <span>Line</span>
-          <input id="qc-line" type="number" inputMode="decimal" step="0.5" min="0" value={value.line} onChange={(e) => set({ line: e.target.value })} placeholder={hint?.mean != null ? (Math.round(hint.mean * 2) / 2).toFixed(1) : '0.5'} />
-        </label>
+      <div className="pboard-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <input id="pb-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any player or team (e.g. Josh Allen, Bijan, KC)" autoComplete="off" spellCheck={false} />
+        {q && <button type="button" className="pb-clear" onClick={() => setQ('')} aria-label="Clear search">×</button>}
       </div>
-      {player && hint?.mean != null && !result && (
-        <p className="qc-hint muted small">Model projects <strong>{f1(hint.mean)}</strong> {MARKETS[market].short.toLowerCase()} for {player.name} {player.opp ? `vs ${player.opp}` : ''}. Enter the PrizePicks line to get a pick.</p>
-      )}
-      {value.player && !player && <p className="qc-hint muted small">Pick a player from the list. Only players with a projection this week can be checked.</p>}
-      {result && !result.unmatched && (
-        <div className={`qc-result ${result.grade.key === 'pass' ? 'pass' : result.side}`}>
-          <div className="qc-verdict">
-            <PickBadge e={result} />
-            <div>
-              <strong className="qc-big">
-                {result.inactive ? 'Avoid: player may not play' : result.grade.key === 'pass' ? 'No edge: too close to call' : `${result.side === 'over' ? 'More' : 'Less'} than ${result.line}`}
-              </strong>
-              <span className="muted small">
-                Model {f1(result.mean)} vs line {result.line} · {Math.round(result.pOver * 100)}% more / {Math.round(result.pUnder * 100)}% less · <span className={`grade-txt g-${result.grade.key}`}>{result.grade.label}</span>
-              </span>
-            </div>
-            <button type="button" className="btn-ghost qc-save" onClick={() => setSaved(onSave({ player: player.name, market, line: lineNum }))}>
-              {saved ? (saved === 'added' ? 'Saved to board ✓' : 'Updated ✓') : 'Save to my board'}
-            </button>
-          </div>
-          <ul className="qc-reasons">
-            {result.reasons.slice(0, 5).map((r, i) => <li key={i} className={`r-${r.tone}`}>{r.text}</li>)}
-          </ul>
-          {result.recent?.length > 0 && (
-            <div className="qc-dots"><span className="muted small">Last {result.recent.length} games vs {result.line}:</span> <HitDots recent={result.recent} line={result.line} /></div>
+      <div className="toolbar">
+        <Segmented options={['ALL', ...SKILL]} value={pos} onChange={setPos} label="Position" />
+        <select value={team} onChange={(e) => setTeam(e.target.value)} aria-label="Team">
+          <option value="ALL">All teams</option>
+          {teams.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort players">
+          <option value="proj">Sort: projection</option>
+          <option value="name">Sort: name</option>
+          <option value="team">Sort: team</option>
+        </select>
+        <label className="check"><input type="checkbox" checked={hideStarted} onChange={(e) => setHideStarted(e.target.checked)} /> Upcoming games only</label>
+      </div>
+      {list.length === 0 ? (
+        <Card><Empty title={`No players match “${q}”`}>Check the spelling, or clear the position and team filters. Players on bye or ruled out this week have no projection.</Empty></Card>
+      ) : (
+        <div className="pb-list">
+          {list.slice(0, limit).map((r) => (
+            <PlayerPropRow key={r.id} r={r} ctx={ctx} lines={linesByPlayer[normName(r.name)] || {}} open={openId === r.id} onToggle={() => setOpenId(openId === r.id ? null : r.id)} onSave={onSave} />
+          ))}
+          {list.length > limit && (
+            <button type="button" className="more-btn card" onClick={() => setLimit((l) => l + PAGE)}>Show more players · {list.length - limit} remaining</button>
           )}
         </div>
       )}
@@ -578,39 +596,92 @@ function QuickCheck({ ctx, rows, value, onChange, onSave }) {
   );
 }
 
-const BOARD_MARKETS = ['player_pass_yds', 'player_rush_yds', 'player_reception_yds', 'player_receptions', 'player_pass_tds', 'player_rush_reception_yds'];
-
-/** With no PrizePicks feed, show the model's own number for each player so the page is still useful. */
-function ModelBoard({ ctx, rows, onPick }) {
-  const [market, setMarket] = useState('player_pass_yds');
-  const M = MARKETS[market];
-  const list = useMemo(() => {
-    if (!ctx || !rows) return [];
-    return rows
-      .filter((r) => M.pos.includes(r.pos) && !BAD_STATUS.includes(r.injury) && (M.get(r.s) ?? 0) > 0)
-      .map((r) => evaluateProp({ id: `b:${r.id}|${market}`, player: r.name, market, line: 0.5 }, ctx))
-      .filter((e) => e && !e.unmatched && e.mean > 0)
-      .sort((a, b) => b.mean - a.mean)
-      .slice(0, 12);
-  }, [ctx, rows, market, M]);
+function PlayerPropRow({ r, ctx, lines, open, onToggle, onSave }) {
+  const { gameByTeam } = useData();
+  const g = gameByTeam[r.team];
+  const keys = KEY_MARKETS[r.pos] || [];
+  const chips = useMemo(
+    () => keys.map((m) => {
+      const ln = lines[m]?.line;
+      const e = evaluateProp({ id: `c:${r.id}|${m}`, player: r.name, market: m, line: ln ?? 0.5 }, ctx);
+      return { m, e, ln };
+    }),
+    [r, ctx, lines], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const lineCount = Object.keys(lines).length;
   return (
-    <Card
-      title="Model numbers"
-      subtitle="Our projected number for each player. Compare it to the PrizePicks line: a line well below means lean More, well above means lean Less. Tap a player to check their exact line."
-      action={<select value={market} onChange={(e) => setMarket(e.target.value)} aria-label="Stat for model numbers">{BOARD_MARKETS.map((k) => <option key={k} value={k}>{MARKETS[k].label}</option>)}</select>}
-      pad={false}
-    >
-      <div className="board">
-        {list.map((e, i) => (
-          <button type="button" key={e.id} className="board-row" onClick={() => onPick(e.player, market, e.mean)}>
-            <span className="pline-rank">{i + 1}</span>
-            <Avatar player={{ id: e.playerId || '0', pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] }} size={34} />
-            <span className="board-name"><strong>{e.player}</strong><small>{e.pos} · {e.team}{e.opp ? ` vs ${e.opp}` : ''}</small></span>
-            <span className="board-range muted small">{e.sd ? `${f1(Math.max(0, e.mean - e.sd))}–${f1(e.mean + e.sd)}` : ''}</span>
-            <span className="board-mean"><strong>{f1(e.mean)}</strong><small>{M.short}</small></span>
-          </button>
-        ))}
+    <article className={`pb-row ${open ? 'open' : ''}`}>
+      <button type="button" className="pb-main" onClick={onToggle} aria-expanded={open}>
+        <Avatar player={r} size={42} />
+        <span className="pb-id">
+          <span className="cell-name">{r.name}<InjuryDot status={r.injury} part={r.injuryPart} /></span>
+          <span className="cell-meta">
+            <PosBadge pos={r.pos} /> <TeamLogo abbr={r.team} size={13} /> {r.team}
+            <span className="muted">{g && g.away.abbr === r.team ? '@' : 'vs'} {r.opp}</span>
+            {g && <span className="pb-when">{g.state === 'pre' ? kickoff(g.date) : g.state === 'in' ? <span className="live-txt"><span className="live-dot" /> Live</span> : 'Final'}</span>}
+          </span>
+        </span>
+        <span className="pb-chips">
+          {chips.map(({ m, e, ln }) => (
+            <span key={m} className={`pb-chip ${ln != null && e && e.grade.key !== 'pass' ? e.side : ''}`}>
+              <small>{MARKETS[m].short}</small>
+              <strong>{e?.mean != null ? f1(e.mean) : '—'}</strong>
+              {ln != null && e && <em>{e.grade.key === 'pass' ? `line ${ln}` : `${e.side === 'over' ? 'More' : 'Less'} ${ln} · ${Math.round(e.prob * 100)}%`}</em>}
+            </span>
+          ))}
+        </span>
+        {lineCount > 0 && <span className="pb-linecount" title="Lines entered or loaded for this player">{lineCount} line{lineCount === 1 ? '' : 's'}</span>}
+        <svg className="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {open && <PropSheet r={r} ctx={ctx} lines={lines} onSave={onSave} />}
+    </article>
+  );
+}
+
+/** Every stat market for one player: model number, recent games, and a line box. */
+function PropSheet({ r, ctx, lines, onSave }) {
+  const markets = Object.entries(MARKETS).filter(([, m]) => m.pos.includes(r.pos));
+  const [vals, setVals] = useState(() => Object.fromEntries(markets.map(([k]) => [k, lines[k]?.line != null ? String(lines[k].line) : ''])));
+  const [saved, setSaved] = useState({});
+  return (
+    <div className="sheet">
+      <div className="sheet-head">
+        <span>Stat</span><span>Model</span><span className="hide-sm">Last 5 games</span><span>PrizePicks line</span><span>Pick</span>
       </div>
-    </Card>
+      {markets.map(([k, M]) => {
+        const lineNum = parseFloat(vals[k]);
+        const has = Number.isFinite(lineNum) && lineNum >= 0;
+        const e = evaluateProp({ id: `s:${r.id}|${k}`, player: r.name, market: k, line: has ? lineNum : 0.5 }, ctx);
+        if (!e || e.unmatched || e.mean == null) return null;
+        const last5 = (e.recent || []).slice(-5);
+        return (
+          <div key={k} className="sheet-row">
+            <span className="sheet-stat">{M.label}{lines[k]?.source === 'prizepicks' && <span className="tag tone-good">PP</span>}</span>
+            <span className="sheet-model"><strong>{f1(e.mean)}</strong><small>{f1(Math.max(0, e.mean - (e.sd || Math.sqrt(e.mean))))}–{f1(e.mean + (e.sd || Math.sqrt(e.mean)))}</small></span>
+            <span className="sheet-last hide-sm">
+              {last5.length ? last5.map((h) => <span key={h.week} className={has ? (h.val > lineNum ? 'o' : h.val < lineNum ? 'u' : 'p') : ''} title={`Wk ${h.week} vs ${h.opp}`}>{Math.round(h.val * 10) / 10}</span>) : <span className="muted">—</span>}
+            </span>
+            <span className="sheet-input">
+              <input
+                type="number" inputMode="decimal" step="0.5" min="0" aria-label={`${M.label} line`}
+                value={vals[k]} placeholder={(Math.round(e.mean * 2) / 2).toFixed(1)}
+                onChange={(ev) => { setVals((v) => ({ ...v, [k]: ev.target.value })); setSaved((x) => ({ ...x, [k]: false })); }}
+              />
+            </span>
+            <span className="sheet-pick">
+              {has ? (
+                <>
+                  <PickBadge e={e} size="sm" />
+                  <button type="button" className={`star ${saved[k] ? 'on' : ''}`} title="Save to your lines" aria-label="Save line" onClick={() => { onSave({ player: r.name, market: k, line: lineNum }); setSaved((x) => ({ ...x, [k]: true })); }}>
+                    {saved[k] ? '★' : '☆'}
+                  </button>
+                </>
+              ) : <span className="muted small">Enter line</span>}
+            </span>
+          </div>
+        );
+      })}
+      <p className="muted small sheet-note">Model = projected stat this week (range covers about 2 of 3 outcomes). Enter the PrizePicks number to see More or Less with its probability. Tap ☆ to keep it in your saved lines.</p>
+    </div>
   );
 }

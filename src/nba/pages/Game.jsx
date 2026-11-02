@@ -6,6 +6,7 @@ import { useNbaRows } from '../components.jsx';
 import { parseNbaSummary } from '../gamecast.js';
 import { buildFeed } from '../../liveFeed.js';
 import LiveFeed from '../../components/LiveFeed.jsx';
+import GameTabs from '../../components/GameTabs.jsx';
 
 const LIVE_MS = 10000;
 const IDLE_MS = 60000;
@@ -86,33 +87,23 @@ export default function NbaGame({ params }) {
 
   return (
     <div className="page game-page">
-      <div className="game-topline">
-        <a className="back-link" href="#/nba/home">← Tonight</a>
-        <span className="muted small">
-          {game.state === 'in' ? <><span className="live-dot" /> Live · updates every {LIVE_MS / 1000}s</> : game.state === 'post' ? 'Final' : 'Pregame'}
-          {fetchedAt && ` · refreshed ${timeAgo(fetchedAt)}`}
-          {error && ' · reconnecting…'}
-        </span>
-      </div>
-      <Scorebug game={game} color={color} />
-      {game.state === 'in' && game.lastPlay && (
-        <section className="field-wrap">
-          <div className="field-head">
-            <span>{game.lastPlay.team && <TeamLogo abbr={game.lastPlay.team} size={18} />} <strong>{Q(game.lastPlay.period)} {game.lastPlay.clock}</strong></span>
-            <span className="muted small">{game.away.abbr} {game.lastPlay.awayScore} – {game.lastPlay.homeScore} {game.home.abbr}</span>
-          </div>
-          <p className="last-play"><span className="muted">Last play:</span> {game.lastPlay.text}</p>
-        </section>
-      )}
-      <div className="game-grid">
-        <div className="game-main">
-          <Segmented label="Game view" value={tab} onChange={setTab} options={[{ value: 'feed', label: 'Live feed' }, { value: 'plays', label: 'Play-by-play' }, { value: 'box', label: 'Box score' }, { value: 'fantasy', label: 'Fantasy' }]} />
-          {tab === 'feed' && <LiveFeed feed={game.feed} game={game} color={color} sport="nba" />}
-          {tab === 'plays' && <PlayByPlay game={game} color={color} />}
-          {tab === 'box' && <BoxScore game={game} />}
-          {tab === 'fantasy' && <GameFantasy game={game} />}
+      <div className="game-dock">
+        <div className="game-topline">
+          <a className="back-link" href="#/nba/home">← Tonight</a>
+          <span className="muted small">
+            {game.state === 'in' ? <><span className="live-dot" /> Live · every {LIVE_MS / 1000}s</> : game.state === 'post' ? 'Final' : 'Pregame'}
+            {fetchedAt && ` · ${timeAgo(fetchedAt)}`}
+            {error && ' · reconnecting…'}
+          </span>
         </div>
-        <aside className="game-side">
+        <Scorebug game={game} color={color} />
+        <GameTabs value={tab} onChange={setTab} tabs={[{ value: 'feed', label: 'Feed' }, { value: 'box', label: 'Box score' }, { value: 'stats', label: 'Stats' }, { value: 'fantasy', label: 'Fantasy' }]} />
+      </div>
+
+      {tab === 'feed' && <LiveFeed feed={game.feed} game={game} color={color} sport="nba" />}
+      {tab === 'box' && <BoxScore game={game} />}
+      {tab === 'stats' && (
+        <div className="stats-stack">
           {game.winprob.length > 1 && <WinProbChart game={game} color={color} />}
           <TeamStats game={game} color={color} />
           <Card title="Game info">
@@ -124,8 +115,11 @@ export default function NbaGame({ params }) {
             </dl>
             <a className="link small" href={`https://www.espn.com/nba/game/_/gameId/${game.id}`} target="_blank" rel="noreferrer">Open on ESPN →</a>
           </Card>
-        </aside>
-      </div>
+          <div className="section-head"><h2>Full play log</h2></div>
+          <PlayByPlay game={game} color={color} />
+        </div>
+      )}
+      {tab === 'fantasy' && <GameFantasy game={game} />}
     </div>
   );
 }

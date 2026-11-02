@@ -47,7 +47,8 @@ function Shell({ route, sport }) {
   return (
     <>
       <Header route={route} />
-      <Ticker />
+      {/* Home has its own swipeable game cards; game pages go full screen. */}
+      {route.path !== 'game' && route.path !== 'home' && <Ticker />}
       <main className="main">
         {error && (
           <div className="banner error" role="alert">

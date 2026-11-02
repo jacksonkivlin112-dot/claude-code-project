@@ -1,3 +1,4 @@
+import HomeFeed from '../../components/HomeFeed.jsx';
 import { useState } from 'react';
 import { useData } from '../../data.jsx';
 import { GameStatus } from '../../components/shell.jsx';
@@ -44,6 +45,7 @@ export default function NbaHome() {
 
   return (
     <div className="page">
+      <HomeFeed sport="nba" />
       <section className="hero">
         <div>
           <p className="eyebrow">{core.label} NBA season</p>

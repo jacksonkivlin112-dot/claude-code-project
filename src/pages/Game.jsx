@@ -4,6 +4,7 @@ import { useData } from '../data.jsx';
 import { parseSummary } from '../gamecast.js';
 import { buildFeed } from '../liveFeed.js';
 import LiveFeed from '../components/LiveFeed.jsx';
+import GameTabs from '../components/GameTabs.jsx';
 import { useProjectionRows } from '../components/players.jsx';
 import { Avatar, Card, Empty, Segmented, SkeletonRows, TeamLogo, f1, kickoff, timeAgo, useNow, useUi } from '../components/ui.jsx';
 
@@ -70,7 +71,7 @@ export default function Game({ params }) {
   if (!game) {
     return (
       <div className="page">
-        <a className="back-link" href="#/home">← This Week</a>
+        <a className="back-link" href="#/home">← Week</a>
         {error ? (
           <Card>
             <Empty title="Live play-by-play couldn’t load">
@@ -94,44 +95,47 @@ export default function Game({ params }) {
   };
   return (
     <div className="page game-page">
-      <div className="game-topline">
-        <a className="back-link" href="#/home">← This Week</a>
-        <span className="muted small">
-          {game.state === 'in' ? <><span className="live-dot" /> Live · updates every {LIVE_MS / 1000}s</> : game.state === 'post' ? 'Final' : 'Pregame'}
-          {fetchedAt && ` · refreshed ${timeAgo(fetchedAt)}`}
-          {error && ' · reconnecting…'}
-        </span>
+      <div className="game-dock">
+        <div className="game-topline">
+          <a className="back-link" href="#/home">← Week</a>
+          <span className="muted small">
+            {game.state === 'in' ? <><span className="live-dot" /> Live · every {LIVE_MS / 1000}s</> : game.state === 'post' ? 'Final' : 'Pregame'}
+            {fetchedAt && ` · ${timeAgo(fetchedAt)}`}
+            {error && ' · reconnecting…'}
+          </span>
+        </div>
+        <Scorebug game={game} color={color} />
+        <GameTabs
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { value: 'feed', label: 'Feed' },
+            { value: 'box', label: 'Box score' },
+            { value: 'stats', label: 'Stats' },
+            { value: 'fantasy', label: 'Fantasy' },
+          ]}
+        />
       </div>
 
-      <Scorebug game={game} color={color} />
-      {game.state !== 'pre' && <Field game={game} color={color} />}
-
-      <div className="game-grid">
-        <div className="game-main">
-          <Segmented
-            label="Game view"
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'feed', label: 'Live feed' },
-              { value: 'plays', label: 'Drives' },
-              { value: 'scoring', label: 'Scoring' },
-              { value: 'box', label: 'Box score' },
-              { value: 'fantasy', label: 'Fantasy' },
-            ]}
-          />
-          {tab === 'feed' && <LiveFeed feed={game.feed} game={game} color={color} sport="nfl" />}
-          {tab === 'plays' && <PlayByPlay game={game} color={color} />}
-          {tab === 'scoring' && <Scoring game={game} />}
-          {tab === 'box' && <BoxScore game={game} />}
-          {tab === 'fantasy' && <GameFantasy game={game} />}
-        </div>
-        <aside className="game-side">
+      {tab === 'feed' && (
+        <>
+          {game.state !== 'pre' && <Field game={game} color={color} />}
+          <LiveFeed feed={game.feed} game={game} color={color} sport="nfl" />
+        </>
+      )}
+      {tab === 'box' && <BoxScore game={game} />}
+      {tab === 'stats' && (
+        <div className="stats-stack">
           {game.winprob.length > 1 && <WinProbChart game={game} color={color} />}
           <TeamStats game={game} color={color} />
+          <div className="section-head"><h2>Scoring summary</h2></div>
+          <Scoring game={game} />
+          <div className="section-head"><h2>Drives</h2></div>
+          <PlayByPlay game={game} color={color} />
           <GameInfo game={game} />
-        </aside>
-      </div>
+        </div>
+      )}
+      {tab === 'fantasy' && <GameFantasy game={game} />}
     </div>
   );
 }

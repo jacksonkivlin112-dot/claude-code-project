@@ -41,6 +41,7 @@ export function parseNbaSummary(d) {
     shooting: !!p.shootingPlay,
     awayScore: p.awayScore,
     homeScore: p.homeScore,
+    wallclock: p.wallclock,
   }));
   const periodByPlay = Object.fromEntries(plays.map((p) => [p.id, p.period]));
   const winprob = (d.winprobability || []).map((w) => ({ home: w.homeWinPercentage, playId: w.playId, period: periodByPlay[w.playId] }));

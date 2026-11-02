@@ -1507,3 +1507,64 @@ a.tick:hover { box-shadow: var(--glow); }
   .pl-swap { grid-column: 3; grid-row: 1; }
   .pl-stats { grid-column: 2; grid-row: 2; align-items: flex-end; justify-self: end; }
 }
+
+/* ===== Live feed ========================================================= */
+.lf { display: flex; flex-direction: column; gap: 10px; position: relative; }
+.lf-sticky {
+  position: sticky; top: calc(env(safe-area-inset-top, 0px) + 58px); z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 12px; border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(12px); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
+}
+.lf-score { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 22px; font-weight: 800; }
+.lf-clock { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: 12px; font-weight: 800; color: var(--text-2); padding: 0 6px; }
+.lf-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.lf-pill { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 116px); z-index: 6; align-self: center; padding: 8px 16px; border-radius: 999px; background: var(--grad-strong); color: #fff; font-weight: 800; box-shadow: var(--glow); animation: fade 0.25s ease; }
+.lf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.lf-period { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 18px; color: var(--text-3); letter-spacing: 0.06em; padding: 6px 2px 0; }
+.lf-card {
+  position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--border);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tc) 14%, transparent), transparent 40%), var(--surface);
+  box-shadow: inset 4px 0 0 var(--tc);
+  transition: transform 0.2s;
+}
+.lf-card.new { animation: lfIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), lfGlow 5s ease-out; }
+@keyframes lfIn { from { transform: translateY(-10px) scale(0.98); opacity: 0; } }
+@keyframes lfGlow { 0% { box-shadow: inset 4px 0 0 var(--tc), 0 0 0 2px var(--gold), 0 0 30px -4px var(--gold); } 100% { box-shadow: inset 4px 0 0 var(--tc); } }
+.lf-card.big {
+  border: 1px solid transparent;
+  background: radial-gradient(500px 160px at 0% 0%, color-mix(in srgb, var(--tc) 30%, transparent), transparent 70%) padding-box, linear-gradient(var(--surface), var(--surface)) padding-box, linear-gradient(135deg, var(--tc), var(--accent) 60%, var(--accent-2)) border-box;
+  box-shadow: 0 12px 34px -14px color-mix(in srgb, var(--tc) 70%, transparent);
+}
+.lf-banner { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 15px; letter-spacing: 0.12em; padding: 5px 16px; }
+.lf-banner.tone-great { background: linear-gradient(90deg, var(--great-bg), transparent); }
+.lf-banner.tone-worst, .lf-banner.tone-bad { background: linear-gradient(90deg, var(--worst-bg), transparent); }
+.lf-banner.tone-hot { background: linear-gradient(90deg, var(--hot-bg), transparent); }
+.lf-banner.tone-good { background: linear-gradient(90deg, var(--good-bg), transparent); }
+.lf-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; padding: 12px 14px; align-items: start; }
+.lf-faces { display: flex; align-items: flex-end; }
+.lf-faces .lf-head + .lf-head { margin-left: -12px; }
+.lf-head { border-radius: 50%; overflow: hidden; display: inline-grid; place-items: center; background: var(--surface-3); box-shadow: 0 0 0 2px var(--ring, var(--accent)), 0 0 0 4px var(--surface); flex: none; }
+.lf-head img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.15) translateY(6%); }
+.lf-init { font-weight: 800; font-size: 13px; color: var(--text-2); }
+.lf-teamface { width: 42px; display: grid; place-items: center; }
+.lf-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lf-who { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.lf-who strong { font-weight: 800; font-size: 15px; }
+.lf-card.big .lf-who strong { font-size: 17px; }
+.lf-arrow { color: var(--text-3); font-weight: 600; }
+.lf-time { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lf-dd { font-size: 11px; font-weight: 800; color: var(--accent); letter-spacing: 0.03em; }
+.lf-text { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.45; }
+.lf-card.big .lf-text { color: var(--text); font-size: 14px; }
+.lf-line { font-size: 12px; font-weight: 700; color: var(--gold); }
+.lf-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.lf-swing { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.lf-swing.hot { background: var(--hot-bg); color: var(--hot); }
+.lf-scorebox { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.lf-scorebox b { font-family: var(--font-display); font-size: 18px; color: var(--text); margin-left: 4px; }
+.lf-empty { padding: 30px; }
+@media (max-width: 860px) {
+  .lf-sticky { top: calc(env(safe-area-inset-top, 0px) + 54px); }
+  .lf-row { grid-template-columns: auto minmax(0, 1fr); gap: 10px; padding: 10px 12px; }
+  .lf-scorebox { grid-column: 2; flex-direction: row; gap: 10px; justify-self: start; }
+  .lf-who { flex-direction: column; gap: 1px; }
+}

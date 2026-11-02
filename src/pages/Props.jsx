@@ -107,9 +107,9 @@ export default function Props() {
   const [showSettings, setShowSettings] = useState(false);
   const [showStarted, setShowStarted] = useState(false);
 
-  const evaluated = useMemo(() => {
+  const ctx = useMemo(() => {
     if (!rows || !outlook) return null;
-    const ctx = {
+    return {
       lookups: buildLookups(rows, season, teams),
       season,
       ranks,
@@ -118,8 +118,14 @@ export default function Props() {
       liveById,
       gameByTeam,
     };
-    return P.lines.map((l) => evaluateProp(l, ctx)).filter(Boolean);
-  }, [rows, outlook, P.lines, season, ranks, liveById, gameByTeam, teams]);
+  }, [rows, outlook, season, ranks, liveById, gameByTeam, teams]);
+  const evaluated = useMemo(() => (ctx ? P.lines.map((l) => evaluateProp(l, ctx)).filter(Boolean) : null), [ctx, P.lines]);
+  const [check, setCheck] = useState({ player: '', market: 'player_pass_yds', line: '' });
+  const saveCheck = (c) => {
+    const exists = P.manual.some((m) => normName(m.player) === normName(c.player) && m.market === c.market);
+    P.setManual([...P.manual.filter((m) => !(normName(m.player) === normName(c.player) && m.market === c.market)), { player: c.player, market: c.market, line: Number(c.line), added: Date.now() }]);
+    return exists ? 'updated' : 'added';
+  };
 
   const marketsPresent = useMemo(() => [...new Set((evaluated || []).map((e) => e.market))], [evaluated]);
 
@@ -167,10 +173,15 @@ export default function Props() {
 
       {showSettings && <SourceSettings P={P} rows={rows} />}
 
+      {ctx && <QuickCheck ctx={ctx} rows={rows} value={check} onChange={setCheck} onSave={saveCheck} />}
+
       {!evaluated || !P.snapshotLoaded ? (
         <Card><SkeletonRows n={6} h={64} /></Card>
       ) : P.lines.length === 0 ? (
-        <NoLines onSetup={() => setShowSettings(true)} />
+        <>
+          <ModelBoard ctx={ctx} rows={rows} onPick={(player, mkt, mean) => { setCheck({ player, market: mkt, line: String(Math.round(mean * 2) / 2) }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+          <NoLines onSetup={() => setShowSettings(true)} />
+        </>
       ) : (
         <>
           {best.length > 0 && (
@@ -395,8 +406,8 @@ function NoLines({ onSetup }) {
   return (
     <Card>
       <div className="nolines">
-        <Empty title="No PrizePicks lines loaded yet">
-          PrizePicks has no public API and blocks automated requests. Lines come from The Odds API, which carries PrizePicks player props, or you can add them yourself.
+        <Empty title="Want every PrizePicks line graded automatically?">
+          Use <strong>Check a line</strong> above for any single prop. To load and grade the full PrizePicks board on its own, connect a free The Odds API key. PrizePicks has no public feed, and this source carries its lines.
         </Empty>
         <ol className="steps">
           <li><strong>Site-wide (recommended):</strong> add an <code>ODDS_API_KEY</code> repository secret. The scheduled GitHub Action then refreshes lines for everyone.</li>
@@ -489,5 +500,117 @@ function SourceSettings({ P, rows }) {
         </div>
       </Card>
     </div>
+  );
+}
+
+// ---- Check a line (works with no API key) ----------------------------------
+
+const BAD_STATUS = ['Out', 'IR', 'Doubtful', 'PUP', 'Sus'];
+
+function QuickCheck({ ctx, rows, value, onChange, onSave }) {
+  const [saved, setSaved] = useState(null);
+  const names = useMemo(() => (rows || []).filter((r) => r.pos !== 'K' && r.pos !== 'DEF').map((r) => r.name), [rows]);
+  const player = (rows || []).find((r) => normName(r.name) === normName(value.player));
+  const markets = Object.entries(MARKETS).filter(([, m]) => !player || m.pos.includes(player.pos));
+  const market = markets.some(([k]) => k === value.market) ? value.market : markets[0]?.[0];
+  const hint = useMemo(() => (player && market ? evaluateProp({ id: 'hint', player: player.name, market, line: 0.5 }, ctx) : null), [player, market, ctx]);
+  const lineNum = parseFloat(value.line);
+  const result = useMemo(
+    () => (player && market && Number.isFinite(lineNum) && lineNum >= 0 ? evaluateProp({ id: `q:${player.id}|${market}`, player: player.name, market, line: lineNum }, ctx) : null),
+    [player, market, lineNum, ctx],
+  );
+  const set = (patch) => { setSaved(null); onChange({ ...value, market, ...patch }); };
+
+  return (
+    <section className="qc">
+      <div className="qc-head">
+        <div>
+          <h2 className="qc-title">Check a line</h2>
+          <p className="muted small">Type the player and the number you see on PrizePicks. The model returns More or Less instantly, no setup needed.</p>
+        </div>
+      </div>
+      <div className="qc-form">
+        <label className="qc-field grow">
+          <span>Player</span>
+          <input id="qc-player" list="qc-names" value={value.player} onChange={(e) => set({ player: e.target.value })} placeholder="e.g. Josh Allen" autoComplete="off" />
+          <datalist id="qc-names">{names.map((n) => <option key={n} value={n} />)}</datalist>
+        </label>
+        <label className="qc-field">
+          <span>Stat</span>
+          <select id="qc-market" value={market} onChange={(e) => set({ market: e.target.value })}>
+            {markets.map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+          </select>
+        </label>
+        <label className="qc-field small">
+          <span>Line</span>
+          <input id="qc-line" type="number" inputMode="decimal" step="0.5" min="0" value={value.line} onChange={(e) => set({ line: e.target.value })} placeholder={hint?.mean != null ? (Math.round(hint.mean * 2) / 2).toFixed(1) : '0.5'} />
+        </label>
+      </div>
+      {player && hint?.mean != null && !result && (
+        <p className="qc-hint muted small">Model projects <strong>{f1(hint.mean)}</strong> {MARKETS[market].short.toLowerCase()} for {player.name} {player.opp ? `vs ${player.opp}` : ''}. Enter the PrizePicks line to get a pick.</p>
+      )}
+      {value.player && !player && <p className="qc-hint muted small">Pick a player from the list. Only players with a projection this week can be checked.</p>}
+      {result && !result.unmatched && (
+        <div className={`qc-result ${result.grade.key === 'pass' ? 'pass' : result.side}`}>
+          <div className="qc-verdict">
+            <PickBadge e={result} />
+            <div>
+              <strong className="qc-big">
+                {result.inactive ? 'Avoid: player may not play' : result.grade.key === 'pass' ? 'No edge: too close to call' : `${result.side === 'over' ? 'More' : 'Less'} than ${result.line}`}
+              </strong>
+              <span className="muted small">
+                Model {f1(result.mean)} vs line {result.line} · {Math.round(result.pOver * 100)}% more / {Math.round(result.pUnder * 100)}% less · <span className={`grade-txt g-${result.grade.key}`}>{result.grade.label}</span>
+              </span>
+            </div>
+            <button type="button" className="btn-ghost qc-save" onClick={() => setSaved(onSave({ player: player.name, market, line: lineNum }))}>
+              {saved ? (saved === 'added' ? 'Saved to board ✓' : 'Updated ✓') : 'Save to my board'}
+            </button>
+          </div>
+          <ul className="qc-reasons">
+            {result.reasons.slice(0, 5).map((r, i) => <li key={i} className={`r-${r.tone}`}>{r.text}</li>)}
+          </ul>
+          {result.recent?.length > 0 && (
+            <div className="qc-dots"><span className="muted small">Last {result.recent.length} games vs {result.line}:</span> <HitDots recent={result.recent} line={result.line} /></div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const BOARD_MARKETS = ['player_pass_yds', 'player_rush_yds', 'player_reception_yds', 'player_receptions', 'player_pass_tds', 'player_rush_reception_yds'];
+
+/** With no PrizePicks feed, show the model's own number for each player so the page is still useful. */
+function ModelBoard({ ctx, rows, onPick }) {
+  const [market, setMarket] = useState('player_pass_yds');
+  const M = MARKETS[market];
+  const list = useMemo(() => {
+    if (!ctx || !rows) return [];
+    return rows
+      .filter((r) => M.pos.includes(r.pos) && !BAD_STATUS.includes(r.injury) && (M.get(r.s) ?? 0) > 0)
+      .map((r) => evaluateProp({ id: `b:${r.id}|${market}`, player: r.name, market, line: 0.5 }, ctx))
+      .filter((e) => e && !e.unmatched && e.mean > 0)
+      .sort((a, b) => b.mean - a.mean)
+      .slice(0, 12);
+  }, [ctx, rows, market, M]);
+  return (
+    <Card
+      title="Model numbers"
+      subtitle="Our projected number for each player. Compare it to the PrizePicks line: a line well below means lean More, well above means lean Less. Tap a player to check their exact line."
+      action={<select value={market} onChange={(e) => setMarket(e.target.value)} aria-label="Stat for model numbers">{BOARD_MARKETS.map((k) => <option key={k} value={k}>{MARKETS[k].label}</option>)}</select>}
+      pad={false}
+    >
+      <div className="board">
+        {list.map((e, i) => (
+          <button type="button" key={e.id} className="board-row" onClick={() => onPick(e.player, market, e.mean)}>
+            <span className="pline-rank">{i + 1}</span>
+            <Avatar player={{ id: e.playerId || '0', pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] }} size={34} />
+            <span className="board-name"><strong>{e.player}</strong><small>{e.pos} · {e.team}{e.opp ? ` vs ${e.opp}` : ''}</small></span>
+            <span className="board-range muted small">{e.sd ? `${f1(Math.max(0, e.mean - e.sd))}–${f1(e.mean + e.sd)}` : ''}</span>
+            <span className="board-mean"><strong>{f1(e.mean)}</strong><small>{M.short}</small></span>
+          </button>
+        ))}
+      </div>
+    </Card>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Logo from './Logo.jsx';
 import { useData } from '../data.jsx';
 import { FORMATS } from '../model.js';
 import { Segmented, TeamLogo, kickoff, timeAgo, useNow, useUi } from './ui.jsx';
@@ -26,7 +27,7 @@ function useTheme() {
   });
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0b0f17' : '#f6f7fb');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#06070f' : '#f6f5ff');
     try { localStorage.setItem('ge:pref:theme', theme); } catch { /* ignore */ }
   }, [theme]);
   return [theme, setTheme];
@@ -40,11 +41,7 @@ export function Header({ route }) {
     <header className="topbar">
       <div className="topbar-inner">
         <a className="brand" href="#/home" aria-label="Gridiron Edge home">
-          <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden>
-            <rect width="64" height="64" rx="14" fill="var(--brand-bg)" />
-            <ellipse cx="32" cy="32" rx="22" ry="13" transform="rotate(-35 32 32)" fill="var(--accent)" />
-            <path d="M23 41 41 23M27 33l4 4M31 29l4 4M35 25l4 4" stroke="var(--brand-bg)" strokeWidth="3" strokeLinecap="round" />
-          </svg>
+          <Logo size={34} />
           <span className="brand-text">
             Gridiron<span>Edge</span>
           </span>

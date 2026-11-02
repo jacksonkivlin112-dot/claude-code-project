@@ -9,14 +9,37 @@ import Projections from './pages/Projections.jsx';
 import Props from './pages/Props.jsx';
 import Stats from './pages/Stats.jsx';
 import Teams from './pages/Teams.jsx';
+import { NbaPlayerPanel, NbaTeamPanel } from './nba/components.jsx';
+import { NbaDataProvider } from './nba/data.jsx';
+import NbaGame from './nba/pages/Game.jsx';
+import NbaHome from './nba/pages/Home.jsx';
+import NbaMatchups from './nba/pages/Matchups.jsx';
+import NbaProjections from './nba/pages/Projections.jsx';
+import NbaProps from './nba/pages/Props.jsx';
+import NbaStats from './nba/pages/Stats.jsx';
+import NbaTeams from './nba/pages/Teams.jsx';
 
-const PAGES = { home: Home, game: Game, projections: Projections, props: Props, stats: Stats, teams: Teams, matchups: Matchups };
+const SPORTS = {
+  nfl: {
+    Provider: DataProvider,
+    pages: { home: Home, game: Game, projections: Projections, props: Props, stats: Stats, teams: Teams, matchups: Matchups },
+    panels: {},
+    credit: 'Stats & projections via Sleeper · Scores, standings & logos via ESPN',
+    footer: (core) => (core ? `${core.season} season · data refreshes automatically each week` : ''),
+  },
+  nba: {
+    Provider: NbaDataProvider,
+    pages: { home: NbaHome, game: NbaGame, projections: NbaProjections, props: NbaProps, stats: NbaStats, teams: NbaTeams, matchups: NbaMatchups },
+    panels: { PlayerPanelC: NbaPlayerPanel, TeamPanelC: NbaTeamPanel },
+    credit: 'Box scores & projections via Sleeper · Scores, standings & logos via ESPN',
+    footer: (core) => (core ? `${core.label} season · data refreshes automatically every night` : ''),
+  },
+};
 
-function Shell() {
-  const route = useRoute();
+function Shell({ route, sport }) {
   const { error, reload, updatedAt, core } = useData();
   useNow(30000);
-  const Page = PAGES[route.path] || Home;
+  const Page = sport.pages[route.path] || sport.pages.home;
   return (
     <>
       <Header route={route} />
@@ -34,25 +57,27 @@ function Shell() {
       </main>
       <footer className="footer">
         <span>
-          Stats & projections via Sleeper · Scores, standings & logos via ESPN
+          {sport.credit}
           {updatedAt && <> · Updated {timeAgo(updatedAt)}</>}
         </span>
-        <span className="muted">
-          {core ? `${core.season} season · data refreshes automatically each week` : ''} · Projections are estimates, not guarantees.
-        </span>
+        <span className="muted">{sport.footer(core)} · Projections are estimates, not guarantees.</span>
       </footer>
       <MobileNav route={route} />
-      <Overlay />
+      <Overlay {...sport.panels} />
     </>
   );
 }
 
 export default function App() {
+  const route = useRoute();
+  const sport = SPORTS[route.sport] || SPORTS.nfl;
+  const { Provider } = sport;
+  // Keyed by sport so switching NFL <-> NBA starts each data layer fresh.
   return (
-    <DataProvider>
+    <Provider key={route.sport}>
       <UiProvider>
-        <Shell />
+        <Shell route={route} sport={sport} />
       </UiProvider>
-    </DataProvider>
+    </Provider>
   );
 }

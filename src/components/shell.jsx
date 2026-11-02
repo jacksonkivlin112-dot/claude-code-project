@@ -4,6 +4,18 @@ import { useData } from '../data.jsx';
 import { FORMATS } from '../model.js';
 import { Segmented, TeamLogo, kickoff, timeAgo, useNow, useUi } from './ui.jsx';
 
+const NBA_NAV = [
+  { path: 'home', label: 'Tonight', icon: 'M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z' },
+  { path: 'projections', label: 'Projections', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
+  { path: 'props', label: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
+  { path: 'stats', label: 'Season Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
+  { path: 'teams', label: 'Teams', icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
+  { path: 'matchups', label: 'Matchups', icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
+];
+
+const navFor = (sport) => (sport === 'nba' ? NBA_NAV : NAV);
+const href = (sport, path) => `#/${sport === 'nba' ? 'nba/' : ''}${path}`;
+
 const NAV = [
   { path: 'home', label: 'This Week', icon: 'M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10' },
   { path: 'projections', label: 'Projections', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
@@ -33,35 +45,60 @@ function useTheme() {
   return [theme, setTheme];
 }
 
+function SportSwitch({ route }) {
+  const go = (sport) => {
+    if (sport === route.sport) return;
+    const target = navFor(sport).some((n) => n.path === route.path) ? route.path : 'home';
+    window.location.hash = href(sport, target).slice(1);
+  };
+  return (
+    <div className="sport-switch" role="radiogroup" aria-label="Sport">
+      {['nfl', 'nba'].map((s) => (
+        <button key={s} type="button" role="radio" aria-checked={route.sport === s} className={route.sport === s ? 'on' : ''} onClick={() => go(s)}>
+          <span className={`sport-ico ${s}`} aria-hidden />
+          {s.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Header({ route }) {
-  const { core, fmt, setFmt, updatedAt, reload, loading, anyLive } = useData();
+  const { core, fmt, setFmt, updatedAt, reload, loading, anyLive, date } = useData();
+  const nav = navFor(route.sport);
+  const pill = core
+    ? core.sport === 'nba'
+      ? `${core.label} · ${date ? new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) : ''}`
+      : `${core.season} · Week ${core.week}`
+    : null;
   const [theme, setTheme] = useTheme();
   useNow(30000);
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <a className="brand" href="#/home" aria-label="Gridiron Edge home">
+        <a className="brand" href={href(route.sport, 'home')} aria-label="Gridiron Edge home">
           <Logo size={34} />
           <span className="brand-text">
             Gridiron<span>Edge</span>
           </span>
         </a>
-        {core && (
-          <span className="week-pill" title={`${core.season} ${core.seasonType} season`}>
+        <SportSwitch route={route} />
+        {pill && (
+          <span className="week-pill">
             {anyLive && <span className="live-dot" aria-label="Games live" />}
-            {core.season} · Week {core.week}
+            {pill}
           </span>
         )}
         <nav className="nav" aria-label="Primary">
-          {NAV.map((n) => (
-            <a key={n.path} href={`#/${n.path}`} className={route.path === n.path ? 'active' : ''} aria-current={route.path === n.path ? 'page' : undefined}>
+          {nav.map((n) => (
+            <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''} aria-current={route.path === n.path ? 'page' : undefined}>
               <Icon d={n.icon} size={16} />
               <span>{n.label}</span>
             </a>
           ))}
         </nav>
         <div className="topbar-tools">
-          <Segmented size="sm" label="Scoring format" value={fmt} onChange={setFmt} options={Object.entries(FORMATS).map(([value, v]) => ({ value, label: v.label }))} />
+          {setFmt && <Segmented size="sm" label="Scoring format" value={fmt} onChange={setFmt} options={Object.entries(FORMATS).map(([value, v]) => ({ value, label: v.label }))} />}
           <button type="button" className="icon-btn" onClick={reload} title={updatedAt ? `Updated ${timeAgo(updatedAt)} · click to refresh` : 'Refresh'} aria-label="Refresh data">
             <svg className={loading ? 'spin' : ''} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
               <path d="M21 12a9 9 0 1 1-2.64-6.36M21 4v5h-5" />
@@ -83,8 +120,8 @@ export function Header({ route }) {
 export function MobileNav({ route }) {
   return (
     <nav className="mobile-nav" aria-label="Primary mobile">
-      {NAV.map((n) => (
-        <a key={n.path} href={`#/${n.path}`} className={route.path === n.path ? 'active' : ''}>
+      {navFor(route.sport).map((n) => (
+        <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''}>
           <Icon d={n.icon} size={20} />
           <span>{n.label.split(' ')[0]}</span>
         </a>
@@ -106,17 +143,17 @@ export function GameStatus({ g }) {
 }
 
 export function Ticker() {
-  const { board, loading } = useData();
+  const { board, loading, sport } = useData();
   const { openTeam } = useUi();
   if (!board.games.length) {
-    return <div className="ticker ticker-empty">{loading ? <span className="muted">Loading scores…</span> : <span className="muted">No games scheduled this week</span>}</div>;
+    return <div className="ticker ticker-empty">{loading ? <span className="muted">Loading scores…</span> : <span className="muted">{sport === 'nba' ? 'No games on this date' : 'No games scheduled this week'}</span>}</div>;
   }
   const order = { in: 0, pre: 1, post: 2 };
   const games = [...board.games].sort((a, b) => order[a.state] - order[b.state] || new Date(a.date) - new Date(b.date));
   return (
     <div className="ticker" role="list" aria-label="Scores">
       {games.map((g) => (
-        <a key={g.id} role="listitem" href={`#/game?id=${g.id}`} className={`tick ${g.state} ${g.redZone ? 'rz' : ''}`} title={`${g.away.abbr} @ ${g.home.abbr}: open Game Center`}>
+        <a key={g.id} role="listitem" href={`#/${sport === 'nba' ? 'nba/' : ''}game?id=${g.id}`} className={`tick ${g.state} ${g.redZone ? 'rz' : ''}`} title={`${g.away.abbr} @ ${g.home.abbr}: open Game Center`}>
           <div className="tick-head">
             <GameStatus g={g} />
             {g.tv && <span className="tv">{g.tv}</span>}

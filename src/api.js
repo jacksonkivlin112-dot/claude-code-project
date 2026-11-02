@@ -26,7 +26,7 @@ const KEEP = [
 const mem = new Map();
 const LS_PREFIX = 'ge:v1:';
 
-function readCache(key, ttl) {
+export function readCache(key, ttl) {
   const hit = mem.get(key);
   if (hit && Date.now() - hit.t < ttl) return hit.v;
   try {
@@ -42,7 +42,7 @@ function readCache(key, ttl) {
   return undefined;
 }
 
-function writeCache(key, v, persist) {
+export function writeCache(key, v, persist) {
   const entry = { t: Date.now(), v };
   mem.set(key, entry);
   if (!persist) return;
@@ -62,7 +62,7 @@ export function cacheAge(key) {
   return hit ? hit.t : null;
 }
 
-async function getJSON(url, { retries = 2 } = {}) {
+export async function getJSON(url, { retries = 2 } = {}) {
   let lastErr;
   for (let i = 0; i <= retries; i++) {
     try {
@@ -77,7 +77,7 @@ async function getJSON(url, { retries = 2 } = {}) {
   throw lastErr;
 }
 
-async function cached(key, ttl, loader, persist = true) {
+export async function cached(key, ttl, loader, persist = true) {
   const hit = readCache(key, ttl);
   if (hit !== undefined) return hit;
   const v = await loader();
@@ -85,8 +85,8 @@ async function cached(key, ttl, loader, persist = true) {
   return v;
 }
 
-const MIN = 60 * 1000;
-const HOUR = 60 * MIN;
+export const MIN = 60 * 1000;
+export const HOUR = 60 * MIN;
 
 function pick(stats = {}) {
   const out = {};
@@ -240,7 +240,9 @@ export async function getTeamSchedule(abbr) {
 }
 
 export const headshot = (p) =>
-  p.pos === 'DEF'
+  p.sport === 'nba'
+    ? `https://sleepercdn.com/content/nba/players/thumb/${p.id}.jpg`
+    : p.pos === 'DEF'
     ? `https://sleepercdn.com/images/team_logos/nfl/${p.id.toLowerCase()}.png`
     : `https://sleepercdn.com/content/nfl/players/thumb/${p.id}.jpg`;
 

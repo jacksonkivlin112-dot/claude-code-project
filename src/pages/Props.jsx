@@ -1,21 +1,60 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useData, usePersistentState } from '../data.jsx';
-import { DEFAULT_MARKETS, MARKETS, fetchPrizePicksLines, listEvents, normName } from '../oddsapi.js';
+import { MARKETS, SPORTS, fetchPrizePicksLines, listEvents, normName } from '../oddsapi.js';
 import { BREAKEVEN, buildLookups, evaluateProp, parseManual, probabilities } from '../propsModel.js';
+import { parseManualNba } from '../nba/props.js';
 import { useProjectionRows, useTeamOutlook } from '../components/players.jsx';
 import { Avatar, Card, Empty, InjuryDot, PosBadge, Segmented, SkeletonRows, TeamLogo, WeeklyBars, f1, kickoff, timeAgo, useNow, useUi } from '../components/ui.jsx';
 
-const LS = {
-  key: 'ge:pref:oddsKey',
-  manual: 'ge:props:manual',
-  lines: 'ge:props:lastLines',
-  live: 'ge:props:live',
+const lsKeys = (sport) => {
+  const sfx = sport === 'nba' ? ':nba' : '';
+  return { key: 'ge:pref:oddsKey', manual: `ge:props:manual${sfx}`, lines: `ge:props:lastLines${sfx}`, live: `ge:props:live${sfx}` };
 };
+
+// Sport-specific settings shared by every component on the page.
+const CfgCtx = createContext(null);
+const useCfg = () => useContext(CfgCtx);
+
+const SKILL = ['QB', 'RB', 'WR', 'TE'];
+export const NFL_CFG = {
+  sport: 'nfl',
+  markets: MARKETS,
+  evaluate: evaluateProp,
+  parseManual,
+  groups: SKILL,
+  groupOf: (r) => r.pos,
+  groupLabel: (g) => g,
+  boardMinProj: 0.5,
+  safeMinProj: 5,
+  period: 'week',
+  title: 'PrizePicks Over / Under',
+  example: 'Josh Allen, Pass Yards, 245.5\nBijan Robinson Rush Yds 82.5\nPuka Nacua, Receptions, 6.5',
+  searchHint: 'Search any player or team (e.g. Josh Allen, Bijan, KC)',
+  keyMarkets: {
+    QB: ['player_pass_yds', 'player_pass_tds', 'player_rush_yds'],
+    RB: ['player_rush_yds', 'player_receptions', 'player_rush_reception_yds'],
+    WR: ['player_receptions', 'player_reception_yds'],
+    TE: ['player_receptions', 'player_reception_yds'],
+  },
+  safeMarkets: {
+    QB: ['player_pass_yds', 'player_pass_completions', 'player_pass_attempts', 'player_rush_yds'],
+    RB: ['player_rush_yds', 'player_rush_attempts', 'player_receptions', 'player_reception_yds', 'player_rush_reception_yds'],
+    WR: ['player_receptions', 'player_reception_yds'],
+    TE: ['player_receptions', 'player_reception_yds'],
+  },
+  // Lines below these are too trivial to be offered or worth playing.
+  minLine: {
+    player_pass_yds: 149.5, player_pass_completions: 11.5, player_pass_attempts: 19.5, player_rush_yds: 19.5,
+    player_rush_attempts: 7.5, player_receptions: 2.5, player_reception_yds: 19.5, player_rush_reception_yds: 29.5,
+  },
+  marketsFor: (r) => Object.keys(MARKETS).filter((k) => MARKETS[k].pos.includes(r.pos)),
+};
+
 const readJSON = (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
 
 /** Remember the last line seen for each prop so line moves can be flagged. */
-function withMovement(props) {
+function withMovement(props, LS) {
   const last = readJSON(LS.lines, {});
   const next = { ...last };
   const out = props.map((p) => {
@@ -27,16 +66,18 @@ function withMovement(props) {
   return out;
 }
 
-function usePropLines() {
+function usePropLines(sport) {
+  const LS = lsKeys(sport);
+  const marketsMap = SPORTS[sport].markets;
   const [snapshot, setSnapshot] = useState(null); // {generatedAt, props} | false
   const [live, setLive] = useState(() => readJSON(LS.live, null)); // {fetchedAt, props, remaining}
   const [manual, setManualState] = useState(() => readJSON(LS.manual, []));
   const [apiKey, setApiKeyState] = useState(() => { try { return localStorage.getItem(LS.key) || ''; } catch { return ''; } });
   const [interval, setIntervalPref] = usePersistentState('propsInterval', '15');
-  const [marketsPref, setMarketsPref] = usePersistentState('propsMarkets', DEFAULT_MARKETS.join(','));
+  const [marketsPref, setMarketsPref] = usePersistentState(sport === 'nba' ? 'nbaPropsMarkets' : 'propsMarkets', Object.keys(marketsMap).join(','));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const markets = marketsPref.split(',').filter((m) => MARKETS[m]);
+  const markets = marketsPref.split(',').filter((m) => marketsMap[m]);
 
   const setManual = (v) => { setManualState(v); writeJSON(LS.manual, v); };
   const setApiKey = (k) => {
@@ -45,19 +86,19 @@ function usePropLines() {
   };
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/props.json`, { cache: 'no-cache' })
+    fetch(`${import.meta.env.BASE_URL}data/${sport === 'nba' ? 'nba/' : ''}props.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : false))
-      .then((j) => setSnapshot(j && Array.isArray(j.props) ? { ...j, props: withMovement(j.props) } : false))
+      .then((j) => setSnapshot(j && Array.isArray(j.props) ? { ...j, props: withMovement(j.props, LS) } : false))
       .catch(() => setSnapshot(false));
-  }, []);
+  }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refresh = useCallback(async () => {
     if (!apiKey) return;
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetchPrizePicksLines(apiKey, { markets });
-      const data = { fetchedAt: new Date().toISOString(), props: withMovement(res.props), remaining: res.remaining, used: res.used, games: res.events };
+      const res = await fetchPrizePicksLines(apiKey, { sport, markets });
+      const data = { fetchedAt: new Date().toISOString(), props: withMovement(res.props, LS), remaining: res.remaining, used: res.used, games: res.events };
       setLive(data);
       writeJSON(LS.live, data);
     } catch (e) {
@@ -65,7 +106,7 @@ function usePropLines() {
     } finally {
       setBusy(false);
     }
-  }, [apiKey, markets.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [apiKey, sport, markets.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh while the page is open (credit-aware: user picks the interval).
   useEffect(() => {
@@ -85,28 +126,18 @@ function usePropLines() {
   const lines = [...fetched, ...manualRows.filter((m) => !fetchedIds.has(m.id.slice(2)))];
 
   return {
-    lines, source, asOf, snapshotLoaded: snapshot !== null, live, manual, setManual, apiKey, setApiKey,
+    sport, marketsMap, lines, source, asOf, snapshotLoaded: snapshot !== null, live, manual, setManual, apiKey, setApiKey,
     interval, setIntervalPref, markets, setMarkets: (arr) => setMarketsPref(arr.join(',')), refresh, busy, err,
   };
 }
 
 const GRADE_ORDER = { strong: 3, solid: 2, lean: 1, pass: 0 };
 
-export default function Props() {
+/** NFL: projections, season logs and the team model feed the prop model. */
+function useNflContext() {
   const { core, season, ranks, liveById, gameByTeam, teams } = useData();
   const rows = useProjectionRows(core?.week);
   const outlook = useTeamOutlook();
-  const P = usePropLines();
-  useNow(30000);
-
-  const [market, setMarket] = useState('ALL');
-  const [side, setSide] = useState('ALL');
-  const [minGrade, setMinGrade] = useState('solid');
-  const [q, setQ] = useState('');
-  const [sort, setSort] = useState('prob');
-  const [showSettings, setShowSettings] = useState(false);
-  const [showStarted, setShowStarted] = useState(false);
-
   const ctx = useMemo(() => {
     if (!rows || !outlook) return null;
     return {
@@ -119,7 +150,36 @@ export default function Props() {
       gameByTeam,
     };
   }, [rows, outlook, season, ranks, liveById, gameByTeam, teams]);
-  const evaluated = useMemo(() => (ctx ? P.lines.map((l) => evaluateProp(l, ctx)).filter(Boolean) : null), [ctx, P.lines]);
+  return { ctx, rows };
+}
+
+export default function Props() {
+  return <PropsPage cfg={NFL_CFG} useSportContext={useNflContext} />;
+}
+
+export function PropsPage({ cfg, useSportContext }) {
+  const { ctx, rows } = useSportContext();
+  const P = usePropLines(cfg.sport);
+  useNow(30000);
+  return (
+    <CfgCtx.Provider value={cfg}>
+      <PropsBody ctx={ctx} rows={rows} P={P} />
+    </CfgCtx.Provider>
+  );
+}
+
+function PropsBody({ ctx, rows, P }) {
+  const cfg = useCfg();
+
+  const [market, setMarket] = useState('ALL');
+  const [side, setSide] = useState('ALL');
+  const [minGrade, setMinGrade] = useState('solid');
+  const [q, setQ] = useState('');
+  const [sort, setSort] = useState('prob');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showStarted, setShowStarted] = useState(false);
+
+  const evaluated = useMemo(() => (ctx ? P.lines.map((l) => cfg.evaluate(l, ctx)).filter(Boolean) : null), [ctx, P.lines, cfg]);
   const saveCheck = (c) => {
     const exists = P.manual.some((m) => normName(m.player) === normName(c.player) && m.market === c.market);
     P.setManual([...P.manual.filter((m) => !(normName(m.player) === normName(c.player) && m.market === c.market)), { player: c.player, market: c.market, line: Number(c.line), added: Date.now() }]);
@@ -150,7 +210,8 @@ export default function Props() {
       <div className="page-head">
         <div>
           <p className="eyebrow">Player props</p>
-          <h1>PrizePicks Over / Under</h1>
+          <h1>{cfg.title}</h1>
+          {cfg.HeaderExtra && <cfg.HeaderExtra />}
           <p className="hero-sub">
             Each line is run through our model: projection, season and recent form, opponent matchup, game script and injuries. The result is a hit probability for the over and the under. Picks need to clear PrizePicks’ ~{Math.round(BREAKEVEN * 1000) / 10}% per-leg break-even to count as an edge.
           </p>
@@ -195,7 +256,7 @@ export default function Props() {
 
               {graded.length > 0 && (
                 <div className="record-bar">
-                  <span>Model record this week (graded picks):</span>
+                  <span>Model record this {cfg.period} (graded picks):</span>
                   <strong className={wins / graded.length >= BREAKEVEN ? 'pos-txt' : 'neg-txt'}>{wins}-{graded.length - wins}</strong>
                   <span className="muted">{Math.round((wins / graded.length) * 100)}% hit rate</span>
                 </div>
@@ -205,7 +266,7 @@ export default function Props() {
               <div className="toolbar">
                 <select value={market} onChange={(e) => setMarket(e.target.value)} aria-label="Stat type">
                   <option value="ALL">All stats</option>
-                  {marketsPresent.map((m) => <option key={m} value={m}>{MARKETS[m].label}</option>)}
+                  {marketsPresent.map((m) => <option key={m} value={m}>{cfg.markets[m].label}</option>)}
                 </select>
                 <Segmented options={['ALL', 'OVER', 'UNDER']} value={side} onChange={setSide} label="Pick side" />
                 <select value={minGrade} onChange={(e) => setMinGrade(e.target.value)} aria-label="Minimum confidence">
@@ -293,7 +354,7 @@ function HitDots({ recent, line }) {
   return (
     <span className="hit-dots" aria-label="Recent games vs line">
       {recent.map((h) => (
-        <span key={h.week} className={`hd ${h.push ? 'push' : h.over ? 'over' : 'under'}`} title={`Wk ${h.week} vs ${h.opp}: ${f1(h.val)} (${h.push ? 'push' : h.over ? 'over' : 'under'} ${line})`} />
+        <span key={h.week} className={`hd ${h.push ? 'push' : h.over ? 'over' : 'under'}`} title={`${h.label || `Wk ${h.week} vs ${h.opp}`}: ${f1(h.val)} (${h.push ? 'push' : h.over ? 'over' : 'under'} ${line})`} />
       ))}
     </span>
   );
@@ -304,7 +365,7 @@ function BestCard({ e }) {
   return (
     <button type="button" className={`best-card ${e.side}`} onClick={() => e.playerId && openPlayer(e.playerId)}>
       <div className="best-top">
-        <Avatar player={{ id: e.playerId || '0', pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] }} size={40} />
+        <Avatar player={{ id: e.playerId || '0', sport: e.sport, pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] }} size={40} />
         <div className="best-name">
           <strong>{e.player}</strong>
           <span className="muted">{e.team} {e.opp ? `vs ${e.opp}` : ''}</span>
@@ -329,7 +390,7 @@ function PropRow({ e }) {
   const { gameByTeam } = useData();
   const g = e.team ? gameByTeam[e.team] : null;
   const away = g && g.away.abbr === e.team;
-  const playerish = { id: e.playerId || '0', pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] };
+  const playerish = { id: e.playerId || '0', sport: e.sport, pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] };
   return (
     <article className={`prop ${openRow ? 'open' : ''} ${e.started ? 'started' : ''}`}>
       <button type="button" className="prop-main" onClick={() => setOpen((o) => !o)} aria-expanded={openRow}>
@@ -393,14 +454,16 @@ function PropRow({ e }) {
             </div>
           </div>
           <div className="prop-chart">
-            <h3>{e.marketShort} by week vs line</h3>
+            <h3>{e.marketShort} by {e.sport === 'nba' ? 'game' : 'week'} vs line</h3>
             {e.recent?.length ? (
               <WeeklyBars
                 height={150}
                 maxWeek={Math.max(...e.recent.map((h) => h.week))}
+                minWeek={e.sport === 'nba' ? Math.min(...e.recent.map((h) => h.week)) : 1}
+                axisLabel={e.sport === 'nba' ? (w) => { const h = e.recent.find((x) => x.week === w); return h ? h.label.split(' ')[0] : ''; } : undefined}
                 refLine={e.line}
                 refLabel="line"
-                data={e.recent.map((h) => ({ week: h.week, value: h.val, label: `vs ${h.opp}`, tone: h.over ? 'up' : 'down' }))}
+                data={e.recent.map((h) => ({ week: h.week, value: h.val, label: h.label || `vs ${h.opp}`, tone: h.over ? 'up' : 'down' }))}
               />
             ) : (
               <Empty title="No game history yet" />
@@ -413,6 +476,7 @@ function PropRow({ e }) {
 }
 
 function NoLines({ onSetup }) {
+  const cfg = useCfg();
   return (
     <Card>
       <div className="nolines">
@@ -422,7 +486,7 @@ function NoLines({ onSetup }) {
         <ol className="steps">
           <li><strong>Site-wide (recommended):</strong> add an <code>ODDS_API_KEY</code> repository secret. The scheduled GitHub Action then refreshes lines for everyone.</li>
           <li><strong>Just this browser:</strong> paste your own The Odds API key under <em>Line sources</em> to auto-refresh lines while this page is open.</li>
-          <li><strong>Manual:</strong> paste lines straight from the PrizePicks app, like <code>Josh Allen, Pass Yards, 245.5</code>.</li>
+          <li><strong>Manual:</strong> paste lines straight from the PrizePicks app, like <code>{cfg.example.split('\n')[0]}</code>.</li>
         </ol>
         <button type="button" className="btn" onClick={onSetup}>Set up line sources</button>
       </div>
@@ -431,6 +495,7 @@ function NoLines({ onSetup }) {
 }
 
 function SourceSettings({ P, rows }) {
+  const cfg = useCfg();
   const [keyInput, setKeyInput] = useState(P.apiKey);
   const [paste, setPaste] = useState('');
   const [msg, setMsg] = useState(null);
@@ -438,13 +503,14 @@ function SourceSettings({ P, rows }) {
 
   useEffect(() => {
     if (!P.apiKey) return;
-    listEvents(P.apiKey)
-      .then((ev) => setGames(ev.filter((e) => { const t = new Date(e.commence_time).getTime(); return t > Date.now() && t - Date.now() < 8 * 86400000; }).length))
+    const horizon = cfg.sport === 'nba' ? 36 * 3600000 : 8 * 86400000;
+    listEvents(P.apiKey, fetch, cfg.sport)
+      .then((ev) => setGames(ev.filter((e) => { const t = new Date(e.commence_time).getTime(); return t > Date.now() && t - Date.now() < horizon; }).length))
       .catch(() => setGames(null));
-  }, [P.apiKey]);
+  }, [P.apiKey, cfg.sport]);
 
   const addManual = () => {
-    const { rows: parsed, errors } = parseManual(paste);
+    const { rows: parsed, errors } = cfg.parseManual(paste);
     const names = new Set((rows || []).map((r) => normName(r.name)));
     const unknown = parsed.filter((p) => !names.has(normName(p.player))).map((p) => p.player);
     const merged = [...P.manual.filter((m) => !parsed.some((p) => normName(p.player) === normName(m.player) && p.market === m.market)), ...parsed.map((p) => ({ ...p, added: Date.now() }))];
@@ -453,7 +519,7 @@ function SourceSettings({ P, rows }) {
     setMsg([
       `Added ${parsed.length} line${parsed.length === 1 ? '' : 's'}.`,
       ...errors,
-      ...(unknown.length ? [`Not projected this week (check spelling, or the player may be injured or on bye): ${unknown.join(', ')}`] : []),
+      ...(unknown.length ? [`Not projected this ${cfg.period} (check spelling, or the player may be injured or not playing): ${unknown.join(', ')}`] : []),
     ]);
   };
 
@@ -485,7 +551,7 @@ function SourceSettings({ P, rows }) {
           <div className="field">
             <span>Stat types</span>
             <div className="chips">
-              {Object.entries(MARKETS).map(([k, m]) => (
+              {Object.entries(cfg.markets).map(([k, m]) => (
                 <button type="button" key={k} className={`chip ${P.markets.includes(k) ? 'on' : ''}`} onClick={() => toggleMarket(k)}>{m.short}</button>
               ))}
             </div>
@@ -498,7 +564,7 @@ function SourceSettings({ P, rows }) {
       </Card>
       <Card title="Add lines manually" subtitle="One per line: player, stat, line">
         <div className="form">
-          <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={6} placeholder={'Josh Allen, Pass Yards, 245.5\nBijan Robinson Rush Yds 82.5\nPuka Nacua, Receptions, 6.5'} />
+          <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={6} placeholder={cfg.example} />
           <div className="field-row">
             <button type="button" className="btn" onClick={addManual} disabled={!paste.trim()}>Add lines</button>
             {P.manual.length > 0 && <button type="button" className="btn-ghost" onClick={() => P.setManual([])}>Clear {P.manual.length} manual line{P.manual.length === 1 ? '' : 's'}</button>}
@@ -516,17 +582,11 @@ function SourceSettings({ P, rows }) {
 // ---- All players board (works with no API key) ------------------------------
 
 const BAD_STATUS = ['Out', 'IR', 'Doubtful', 'PUP', 'Sus'];
-const SKILL = ['QB', 'RB', 'WR', 'TE'];
-const KEY_MARKETS = {
-  QB: ['player_pass_yds', 'player_pass_tds', 'player_rush_yds'],
-  RB: ['player_rush_yds', 'player_receptions', 'player_rush_reception_yds'],
-  WR: ['player_receptions', 'player_reception_yds'],
-  TE: ['player_receptions', 'player_reception_yds'],
-};
 const PAGE = 40;
 const clean = (t) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 
 function PlayerBoard({ ctx, rows, feed, manual, onSave }) {
+  const cfg = useCfg();
   const { gameByTeam } = useData();
   const [q, setQ] = useState('');
   const [pos, setPos] = useState('ALL');
@@ -544,12 +604,12 @@ function PlayerBoard({ ctx, rows, feed, manual, onSave }) {
     return m;
   }, [feed, manual]);
 
-  const players = useMemo(() => (rows || []).filter((r) => SKILL.includes(r.pos) && r.proj >= 0.5), [rows]);
+  const players = useMemo(() => (rows || []).filter((r) => cfg.groups.includes(cfg.groupOf(r)) && r.proj >= cfg.boardMinProj), [rows, cfg]);
   const teams = useMemo(() => [...new Set(players.map((r) => r.team))].sort(), [players]);
   const list = useMemo(() => {
     const tokens = clean(q).split(' ').filter(Boolean);
     const out = players.filter((r) => {
-      if (pos !== 'ALL' && r.pos !== pos) return false;
+      if (pos !== 'ALL' && cfg.groupOf(r) !== pos) return false;
       if (team !== 'ALL' && r.team !== team) return false;
       if (hideStarted && gameByTeam[r.team] && gameByTeam[r.team].state !== 'pre') return false;
       if (!tokens.length) return true;
@@ -568,17 +628,17 @@ function PlayerBoard({ ctx, rows, feed, manual, onSave }) {
       <div className="pboard-head">
         <div>
           <h2 className="qc-title">All player props</h2>
-          <p className="muted small">Every player with a projection this week. Search anyone, tap them, and type the PrizePicks line for any stat to get an instant More or Less.</p>
+          <p className="muted small">Every player with a projection this {cfg.period}. Search anyone, tap them, and type the PrizePicks line for any stat to get an instant More or Less.</p>
         </div>
         <span className="pboard-count">{list.length} <small>of {players.length} players</small></span>
       </div>
       <div className="pboard-search">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-        <input id="pb-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any player or team (e.g. Josh Allen, Bijan, KC)" autoComplete="off" spellCheck={false} />
+        <input id="pb-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={cfg.searchHint} autoComplete="off" spellCheck={false} />
         {q && <button type="button" className="pb-clear" onClick={() => setQ('')} aria-label="Clear search">×</button>}
       </div>
       <div className="toolbar">
-        <Segmented options={['ALL', ...SKILL]} value={pos} onChange={setPos} label="Position" />
+        <Segmented options={['ALL', ...cfg.groups].map((g) => ({ value: g, label: g === 'ALL' ? 'ALL' : cfg.groupLabel(g) }))} value={pos} onChange={setPos} label="Position" />
         <select value={team} onChange={(e) => setTeam(e.target.value)} aria-label="Team">
           <option value="ALL">All teams</option>
           {teams.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -591,7 +651,7 @@ function PlayerBoard({ ctx, rows, feed, manual, onSave }) {
         <label className="check"><input type="checkbox" checked={hideStarted} onChange={(e) => setHideStarted(e.target.checked)} /> Upcoming games only</label>
       </div>
       {list.length === 0 ? (
-        <Card><Empty title={`No players match “${q}”`}>Check the spelling, or clear the position and team filters. Players on bye or ruled out this week have no projection.</Empty></Card>
+        <Card><Empty title={`No players match “${q}”`}>Check the spelling, or clear the position and team filters. Players not playing this {cfg.period} have no projection.</Empty></Card>
       ) : (
         <div className="pb-list">
           {list.slice(0, limit).map((r) => (
@@ -607,13 +667,14 @@ function PlayerBoard({ ctx, rows, feed, manual, onSave }) {
 }
 
 function PlayerPropRow({ r, ctx, lines, open, onToggle, onSave }) {
+  const cfg = useCfg();
   const { gameByTeam } = useData();
   const g = gameByTeam[r.team];
-  const keys = KEY_MARKETS[r.pos] || [];
+  const keys = cfg.keyMarkets[cfg.groupOf(r)] || [];
   const chips = useMemo(
     () => keys.map((m) => {
       const ln = lines[m]?.line;
-      const e = evaluateProp({ id: `c:${r.id}|${m}`, player: r.name, market: m, line: ln ?? 0.5 }, ctx);
+      const e = cfg.evaluate({ id: `c:${r.id}|${m}`, player: r.name, market: m, line: ln ?? 0.5 }, ctx);
       return { m, e, ln };
     }),
     [r, ctx, lines], // eslint-disable-line react-hooks/exhaustive-deps
@@ -634,7 +695,7 @@ function PlayerPropRow({ r, ctx, lines, open, onToggle, onSave }) {
         <span className="pb-chips">
           {chips.map(({ m, e, ln }) => (
             <span key={m} className={`pb-chip ${ln != null && e && e.grade.key !== 'pass' ? e.side : ''}`}>
-              <small>{MARKETS[m].short}</small>
+              <small>{cfg.markets[m].short}</small>
               <strong>{e?.mean != null ? f1(e.mean) : '—'}</strong>
               {ln != null && e && <em>{e.grade.key === 'pass' ? `line ${ln}` : `${e.side === 'over' ? 'More' : 'Less'} ${ln} · ${Math.round(e.prob * 100)}%`}</em>}
             </span>
@@ -650,7 +711,8 @@ function PlayerPropRow({ r, ctx, lines, open, onToggle, onSave }) {
 
 /** Every stat market for one player: model number, recent games, and a line box. */
 function PropSheet({ r, ctx, lines, onSave }) {
-  const markets = Object.entries(MARKETS).filter(([, m]) => m.pos.includes(r.pos));
+  const cfg = useCfg();
+  const markets = cfg.marketsFor(r).map((k) => [k, cfg.markets[k]]);
   const [vals, setVals] = useState(() => Object.fromEntries(markets.map(([k]) => [k, lines[k]?.line != null ? String(lines[k].line) : ''])));
   const [saved, setSaved] = useState({});
   return (
@@ -661,7 +723,7 @@ function PropSheet({ r, ctx, lines, onSave }) {
       {markets.map(([k, M]) => {
         const lineNum = parseFloat(vals[k]);
         const has = Number.isFinite(lineNum) && lineNum >= 0;
-        const e = evaluateProp({ id: `s:${r.id}|${k}`, player: r.name, market: k, line: has ? lineNum : 0.5 }, ctx);
+        const e = cfg.evaluate({ id: `s:${r.id}|${k}`, player: r.name, market: k, line: has ? lineNum : 0.5 }, ctx);
         if (!e || e.unmatched || e.mean == null) return null;
         const last5 = (e.recent || []).slice(-5);
         return (
@@ -669,7 +731,7 @@ function PropSheet({ r, ctx, lines, onSave }) {
             <span className="sheet-stat">{M.label}{lines[k]?.source === 'prizepicks' && <span className="tag tone-good">PP</span>}</span>
             <span className="sheet-model"><strong>{f1(e.mean)}</strong><small>{f1(Math.max(0, e.mean - (e.sd || Math.sqrt(e.mean))))}–{f1(e.mean + (e.sd || Math.sqrt(e.mean)))}</small></span>
             <span className="sheet-last hide-sm">
-              {last5.length ? last5.map((h) => <span key={h.week} className={has ? (h.val > lineNum ? 'o' : h.val < lineNum ? 'u' : 'p') : ''} title={`Wk ${h.week} vs ${h.opp}`}>{Math.round(h.val * 10) / 10}</span>) : <span className="muted">—</span>}
+              {last5.length ? last5.map((h) => <span key={h.week} className={has ? (h.val > lineNum ? 'o' : h.val < lineNum ? 'u' : 'p') : ''} title={h.label || `Wk ${h.week} vs ${h.opp}`}>{Math.round(h.val * 10) / 10}</span>) : <span className="muted">—</span>}
             </span>
             <span className="sheet-input">
               <input
@@ -691,7 +753,7 @@ function PropSheet({ r, ctx, lines, onSave }) {
           </div>
         );
       })}
-      <p className="muted small sheet-note">Model = projected stat this week (range covers about 2 of 3 outcomes). Enter the PrizePicks number to see More or Less with its probability. Tap ☆ to keep it in your saved lines.</p>
+      <p className="muted small sheet-note">Model = projected stat this {cfg.period} (range covers about 2 of 3 outcomes). Enter the PrizePicks number to see More or Less with its probability. Tap ☆ to keep it in your saved lines.</p>
     </div>
   );
 }
@@ -700,21 +762,10 @@ function PropSheet({ r, ctx, lines, onSave }) {
 // For each player and stat, find the highest line that still clears a target
 // probability, then keep only lines the player has also cleared consistently.
 
-const SAFE_MARKETS = {
-  QB: ['player_pass_yds', 'player_pass_completions', 'player_pass_attempts', 'player_rush_yds'],
-  RB: ['player_rush_yds', 'player_rush_attempts', 'player_receptions', 'player_reception_yds', 'player_rush_reception_yds'],
-  WR: ['player_receptions', 'player_reception_yds'],
-  TE: ['player_receptions', 'player_reception_yds'],
-};
-// Lines below these are too trivial to be offered or worth playing.
-const MIN_LINE = {
-  player_pass_yds: 149.5, player_pass_completions: 11.5, player_pass_attempts: 19.5, player_rush_yds: 19.5,
-  player_rush_attempts: 7.5, player_receptions: 2.5, player_reception_yds: 19.5, player_rush_reception_yds: 29.5,
-};
 const Z_UPPER = { 0.7: 0.5244, 0.75: 0.6745, 0.8: 0.8416 };
 
-function floorLine(market, mean, sd, target) {
-  if (MARKETS[market].dist === 'poisson') {
+function floorLine(M, mean, sd, target) {
+  if (M.dist === 'poisson' || (M.poissonBelow && mean < M.poissonBelow)) {
     for (let k = Math.ceil(mean + 4 * Math.sqrt(mean + 1)); k >= 1; k--) {
       if (probabilities('poisson', mean, 0, k - 0.5).over >= target) return k - 0.5;
     }
@@ -724,6 +775,7 @@ function floorLine(market, mean, sd, target) {
 }
 
 function HighChance({ ctx, rows, onSave }) {
+  const cfg = useCfg();
   const { gameByTeam } = useData();
   const { openPlayer } = useUi();
   const [target, setTarget] = useState(0.75);
@@ -736,23 +788,24 @@ function HighChance({ ctx, rows, onSave }) {
     if (!ctx || !rows) return [];
     const out = [];
     for (const r of rows) {
-      if (!SAFE_MARKETS[r.pos] || r.injury || r.proj < 5) continue;
-      for (const m of SAFE_MARKETS[r.pos]) {
-        const base = evaluateProp({ id: `h0:${r.id}|${m}`, player: r.name, market: m, line: 0.5 }, ctx);
+      const safe = cfg.safeMarkets[cfg.groupOf(r)];
+      if (!safe || r.injury || r.proj < cfg.safeMinProj) continue;
+      for (const m of safe) {
+        const base = cfg.evaluate({ id: `h0:${r.id}|${m}`, player: r.name, market: m, line: 0.5 }, ctx);
         if (!base || base.unmatched || !base.mean || base.games < 4) continue;
-        const line = floorLine(m, base.mean, base.sd, target);
+        const line = floorLine(cfg.markets[m], base.mean, base.sd, target);
         // Real PrizePicks lines sit near the projection; skip "safe" lines far below it.
-        if (line == null || line < MIN_LINE[m] || line / base.mean < 0.6) continue;
-        const e = evaluateProp({ id: `h:${r.id}|${m}`, player: r.name, market: m, line }, ctx);
+        if (line == null || line < (cfg.minLine[m] ?? 0.5) || line / base.mean < 0.6) continue;
+        const e = cfg.evaluate({ id: `h:${r.id}|${m}`, player: r.name, market: m, line }, ctx);
         if (!e || e.pOver < target - 0.005 || !e.recent?.length) continue;
         const hits = e.recent.filter((h) => h.over).length;
         const hitRate = hits / e.recent.length;
         if (hitRate < 0.6) continue;
         const g = gameByTeam[r.team];
         out.push({
-          key: e.id, playerId: r.id, player: r.name, first: r.first, last: r.last, pos: r.pos, team: r.team, opp: r.opp,
+          key: e.id, playerId: r.id, player: r.name, first: r.first, last: r.last, pos: r.pos, group: cfg.groupOf(r), team: r.team, opp: r.opp,
           game: g ? g.id : [r.team, r.opp].sort().join('-'), state: g?.state || 'pre', date: g?.date,
-          market: m, stat: MARKETS[m].short, statLabel: MARKETS[m].label, side: 'over', line, prob: e.pOver, mean: e.mean,
+          market: m, stat: cfg.markets[m].short, statLabel: cfg.markets[m].label, sport: cfg.sport, side: 'over', line, prob: e.pOver, mean: e.mean,
           hits, n: e.recent.length, recent: e.recent, cushion: line / e.mean, actual: e.result?.actual,
           // Rank: consistency first, then how realistic (close to the projection) the line is, then model chance.
           score: 0.45 * hitRate + 0.35 * Math.min(1, line / e.mean) + 0.2 * e.pOver,
@@ -763,9 +816,9 @@ function HighChance({ ctx, rows, onSave }) {
     const bestByPlayer = new Map();
     for (const p of out.sort((a, b) => b.score - a.score)) if (!bestByPlayer.has(p.playerId)) bestByPlayer.set(p.playerId, p);
     return [...bestByPlayer.values()];
-  }, [ctx, rows, target, gameByTeam]);
+  }, [ctx, rows, target, gameByTeam, cfg]);
 
-  const shown = picks.filter((p) => (pos === 'ALL' || p.pos === pos) && (!upcoming || p.state === 'pre'));
+  const shown = picks.filter((p) => (pos === 'ALL' || p.group === pos) && (!upcoming || p.state === 'pre'));
   const upcomingCount = picks.filter((p) => p.state === 'pre').length;
 
   return (
@@ -782,12 +835,12 @@ function HighChance({ ctx, rows, onSave }) {
       </div>
       <div className="toolbar">
         <Segmented options={[{ value: 0.7, label: '70%+' }, { value: 0.75, label: '75%+' }, { value: 0.8, label: '80%+' }]} value={target} onChange={setTarget} label="Minimum chance" />
-        <Segmented options={['ALL', ...SKILL]} value={pos} onChange={setPos} label="Position" />
+        <Segmented options={['ALL', ...cfg.groups].map((g) => ({ value: g, label: g === 'ALL' ? 'ALL' : cfg.groupLabel(g) }))} value={pos} onChange={setPos} label="Position" />
         <label className="check"><input type="checkbox" checked={upcoming} onChange={(e) => setUpcoming(e.target.checked)} /> Upcoming games only</label>
       </div>
       {shown.length === 0 ? (
-        <Empty title={upcoming && upcomingCount === 0 ? 'No upcoming games left this week' : 'No picks clear this bar'}>
-          {upcoming && upcomingCount === 0 ? 'Untick “Upcoming games only” to see how this week’s picks did, or check back when next week’s projections post.' : 'Try 70%+ or another position.'}
+        <Empty title={upcoming && upcomingCount === 0 ? `No upcoming games left this ${cfg.period}` : 'No picks clear this bar'}>
+          {upcoming && upcomingCount === 0 ? `Untick “Upcoming games only” to see how this ${cfg.period}’s picks did, or check back when the next projections post.` : 'Try 70%+ or another position.'}
         </Empty>
       ) : (
         <>
@@ -796,7 +849,7 @@ function HighChance({ ctx, rows, onSave }) {
               <article key={p.key} className={`hc-card ${p.state !== 'pre' ? 'played' : ''}`}>
                 <button type="button" className="hc-top" onClick={() => openPlayer(p.playerId)}>
                   <span className="hc-rank">{i + 1}</span>
-                  <Avatar player={{ id: p.playerId, pos: p.pos, team: p.team, first: p.first, last: p.last }} size={40} />
+                  <Avatar player={{ id: p.playerId, sport: p.sport, pos: p.pos, team: p.team, first: p.first, last: p.last }} size={40} />
                   <span className="hc-name"><strong>{p.player}</strong><small>{p.pos} · {p.team} vs {p.opp}{p.state === 'pre' && p.date ? ` · ${kickoff(p.date)}` : ''}</small></span>
                 </button>
                 <div className="hc-line">
@@ -838,7 +891,7 @@ function SlipBuilder({ title, subtitle, picks }) {
   const [size, setSize] = useState(3);
   const legs = [];
   const used = new Set();
-  for (const p of [...picks].sort((a, b) => b.prob - a.prob)) {
+  for (const p of [...picks].sort((a, b) => (b.score ?? b.prob) - (a.score ?? a.prob))) {
     if (legs.length >= size) break;
     if (used.has(p.game)) continue;
     used.add(p.game);

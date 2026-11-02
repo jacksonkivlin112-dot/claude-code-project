@@ -1,4 +1,4 @@
-name: Refresh NFL data & deploy
+name: Refresh NFL & NBA data & deploy
 
 # Player stats and projections load live from Sleeper in the browser.
 # This workflow refreshes the ESPN snapshot (teams, standings, schedule, scores)
@@ -12,6 +12,8 @@ on:
     - cron: '7,37 17-23 * * 0'  # Sunday game window (UTC), every 30 min
     - cron: '7 0-5 * * 1'       # Sunday night / early Monday
     - cron: '7 0-4 * * 2,5'     # Monday & Thursday night games
+    - cron: '22,52 23 * * *'     # NBA tip-offs (UTC evening)
+    - cron: '22,52 0-6 * * *'    # NBA games in progress (US night)
 
 permissions:
   contents: write
@@ -32,14 +34,22 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Refresh ESPN snapshot
+      - name: Refresh NFL ESPN snapshot
         run: npm run data
+      - name: Refresh NBA ESPN snapshot
+        run: npm run data:nba
       - name: Refresh PrizePicks lines (needs ODDS_API_KEY secret)
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           PROPS_MARKETS: ${{ vars.PROPS_MARKETS }}
           PROPS_WITHIN_HOURS: ${{ vars.PROPS_WITHIN_HOURS }}
         run: npm run props
+      - name: Refresh NBA PrizePicks lines (needs ODDS_API_KEY secret)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          NBA_PROPS_MARKETS: ${{ vars.NBA_PROPS_MARKETS }}
+          PROPS_MIN_INTERVAL_MIN: ${{ vars.PROPS_MIN_INTERVAL_MIN || '60' }}
+        run: npm run props:nba
       - name: Commit snapshot if changed
         run: |
           if ! git diff --quiet -- public/data; then

@@ -206,10 +206,11 @@ export function Sparkline({ values, width = 84, height = 24, highlightLast = tru
 }
 
 /** Weekly bar chart with optional dashed reference line (e.g., projection or average). */
-export function WeeklyBars({ data, refLine, refLabel, height = 160, maxWeek = 18 }) {
+export function WeeklyBars({ data, refLine, refLabel, height = 160, maxWeek = 18, minWeek = 1, axisLabel }) {
   const [hover, setHover] = useState(null);
   const byWeek = new Map(data.map((d) => [d.week, d]));
-  const weeks = Array.from({ length: Math.max(maxWeek, ...data.map((d) => d.week), 1) }, (_, i) => i + 1);
+  const last = Math.max(maxWeek, ...data.map((d) => d.week), minWeek);
+  const weeks = Array.from({ length: last - minWeek + 1 }, (_, i) => i + minWeek);
   const max = Math.max(...data.map((d) => d.value), refLine || 0, 5) * 1.12;
   const W = 100 / weeks.length;
   return (
@@ -229,12 +230,12 @@ export function WeeklyBars({ data, refLine, refLabel, height = 160, maxWeek = 18
                   {hover === w && (
                     <div className="wbars-tip">
                       <strong>{d.value.toFixed(1)}</strong>
-                      <span>Wk {w}{d.label ? ` · ${d.label}` : ''}</span>
+                      <span>{axisLabel ? d.label : `Wk ${w}${d.label ? ` · ${d.label}` : ''}`}</span>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="wbars-none" title={`Week ${w}: did not play`} />
+                <div className="wbars-none" title={axisLabel ? 'Did not play' : `Week ${w}: did not play`} />
               )}
             </div>
           );
@@ -242,7 +243,7 @@ export function WeeklyBars({ data, refLine, refLabel, height = 160, maxWeek = 18
       </div>
       <div className="wbars-axis">
         {weeks.map((w) => (
-          <span key={w} style={{ width: `${W}%` }} className={byWeek.has(w) ? '' : 'dim'}>{w}</span>
+          <span key={w} style={{ width: `${W}%` }} className={byWeek.has(w) ? '' : 'dim'}>{axisLabel ? axisLabel(w) : w}</span>
         ))}
       </div>
     </div>

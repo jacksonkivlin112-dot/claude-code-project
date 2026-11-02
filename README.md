@@ -1,5 +1,7 @@
 # Gridiron Edge
 
+NFL **and NBA** stats, projections, live Game Center and PrizePicks prop picks. Use the **NFL | NBA** switch in the header.
+
 A web app for NFL stats, fantasy projections, matchup grades and team outlooks. Built with React and Vite. It rolls over to each new NFL week automatically.
 
 ## Features
@@ -53,3 +55,14 @@ npm run build
 ### Deploying
 
 In the repo, open **Settings → Pages** and set **Source** to **GitHub Actions**. Every push to `main` and every scheduled run then deploys the site.
+
+## NBA
+
+The NBA side (`#/nba/...`) has the same features, built around nightly slates:
+
+- **Tonight:** a date picker that skips empty days, players primed for a big night, teams to watch, smash spots, players heating up, players to start with caution (including back-to-backs), the slate with projected scores and win probability, and value plays.
+- **Projections:** PrizePicks-style fantasy score (PTS + 1.2 REB + 1.5 AST + 3 STL + 3 BLK − TO) and matchup grades by position group (guards, forwards, centers).
+- **Props:** highest-chance picks, a safest slip builder, a searchable board of every player on the slate, and stat-by-stat sheets covering points, rebounds, assists, threes, combos, blocks, steals and turnovers. The model adds pace, blowout risk, back-to-backs and stat-specific matchups.
+- **Season Stats**, **Teams** (rankings for the night plus conference standings with playoff and Play-In zones), **Matchups** (defense-vs-position heatmap by stat) and a live **Game Center** with play-by-play, box score, win probability and live fantasy points.
+
+Data: Sleeper NBA season totals, per-game box scores and per-game projections, plus `public/data/nba/espn.json` (`npm run data:nba`). NBA PrizePicks lines come from `npm run props:nba`, which uses the same `ODDS_API_KEY`.

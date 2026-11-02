@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "data": "node scripts/fetch-espn.mjs",
-    "props": "node scripts/fetch-props.mjs"
+    "props": "node scripts/fetch-props.mjs",
+    "data:nba": "node scripts/fetch-espn-nba.mjs",
+    "props:nba": "node scripts/fetch-props.mjs nba"
   },
   "dependencies": {
     "react": "^18.3.1",

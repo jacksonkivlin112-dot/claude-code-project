@@ -7,7 +7,7 @@ import { PlayerLine, useProjectionRows, useTeamOutlook } from './players.jsx';
 import { GameStatus } from './shell.jsx';
 import { Avatar, Empty, GradeChip, InjuryDot, PosBadge, SkeletonRows, Tag, TeamLogo, WeeklyBars, WinProbBar, f0, f1, kickoff, pct, useUi } from './ui.jsx';
 
-export function Overlay() {
+export function Overlay({ PlayerPanelC = PlayerPanel, TeamPanelC = TeamPanel }) {
   const { overlay, close } = useUi();
   useEffect(() => {
     if (!overlay) return undefined;
@@ -26,7 +26,7 @@ export function Overlay() {
         <button type="button" className="drawer-close" onClick={close} aria-label="Close">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
         </button>
-        {overlay.type === 'player' ? <PlayerPanel id={overlay.id} /> : <TeamPanel abbr={overlay.id} />}
+        {overlay.type === 'player' ? <PlayerPanelC id={overlay.id} /> : <TeamPanelC abbr={overlay.id} />}
       </aside>
     </div>
   );

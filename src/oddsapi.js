@@ -29,6 +29,29 @@ function sum(a, b) {
 
 export const DEFAULT_MARKETS = Object.keys(MARKETS);
 
+// NBA markets. Stats are Sleeper per-game box-score keys.
+const g = (s, k) => s?.[k];
+const add = (s, ...keys) => (keys.every((k) => s?.[k] == null) ? undefined : keys.reduce((a, k) => a + (s?.[k] || 0), 0));
+export const MARKETS_NBA = {
+  player_points: { label: 'Points', short: 'Pts', get: (s) => g(s, 'pts'), dist: 'normal', cv: 0.3 },
+  player_rebounds: { label: 'Rebounds', short: 'Reb', get: (s) => g(s, 'reb'), dist: 'normal', cv: 0.38, poissonBelow: 4.5 },
+  player_assists: { label: 'Assists', short: 'Ast', get: (s) => g(s, 'ast'), dist: 'normal', cv: 0.42, poissonBelow: 4.5 },
+  player_threes: { label: '3-PT Made', short: '3PM', get: (s) => g(s, 'tpm'), dist: 'poisson' },
+  player_blocks: { label: 'Blocks', short: 'Blk', get: (s) => g(s, 'blk'), dist: 'poisson' },
+  player_steals: { label: 'Steals', short: 'Stl', get: (s) => g(s, 'stl'), dist: 'poisson' },
+  player_turnovers: { label: 'Turnovers', short: 'TO', get: (s) => g(s, 'to'), dist: 'poisson' },
+  player_points_rebounds_assists: { label: 'Pts + Reb + Ast', short: 'PRA', get: (s) => add(s, 'pts', 'reb', 'ast'), dist: 'normal', cv: 0.24 },
+  player_points_rebounds: { label: 'Pts + Reb', short: 'P+R', get: (s) => add(s, 'pts', 'reb'), dist: 'normal', cv: 0.26 },
+  player_points_assists: { label: 'Pts + Ast', short: 'P+A', get: (s) => add(s, 'pts', 'ast'), dist: 'normal', cv: 0.26 },
+  player_rebounds_assists: { label: 'Reb + Ast', short: 'R+A', get: (s) => add(s, 'reb', 'ast'), dist: 'normal', cv: 0.32 },
+  player_blocks_steals: { label: 'Blks + Stls', short: 'B+S', get: (s) => add(s, 'blk', 'stl'), dist: 'poisson' },
+};
+
+export const SPORTS = {
+  nfl: { key: 'americanfootball_nfl', markets: MARKETS, label: 'NFL' },
+  nba: { key: 'basketball_nba', markets: MARKETS_NBA, label: 'NBA' },
+};
+
 export function normName(n = '') {
   return n
     .toLowerCase()
@@ -54,9 +77,9 @@ async function get(url, fetchImpl) {
   };
 }
 
-/** Upcoming NFL events (free: does not cost credits). */
-export async function listEvents(apiKey, fetchImpl = fetch) {
-  const { body } = await get(`${ODDS_BASE}/sports/${SPORT}/events?apiKey=${encodeURIComponent(apiKey)}&dateFormat=iso`, fetchImpl);
+/** Upcoming events (free: does not cost credits). */
+export async function listEvents(apiKey, fetchImpl = fetch, sport = 'nfl') {
+  const { body } = await get(`${ODDS_BASE}/sports/${SPORTS[sport].key}/events?apiKey=${encodeURIComponent(apiKey)}&dateFormat=iso`, fetchImpl);
   return body;
 }
 
@@ -64,9 +87,11 @@ export async function listEvents(apiKey, fetchImpl = fetch) {
  * Fetch PrizePicks lines for the given events.
  * Cost: 1 credit per market per event that returns data.
  */
-export async function fetchPrizePicksLines(apiKey, { events, markets = DEFAULT_MARKETS, withinHours = 8 * 24, fetchImpl = fetch } = {}) {
+export async function fetchPrizePicksLines(apiKey, { sport = 'nfl', events, markets, withinHours = sport === 'nba' ? 36 : 8 * 24, fetchImpl = fetch } = {}) {
+  const cfg = SPORTS[sport];
+  markets = markets?.length ? markets : Object.keys(cfg.markets);
   const now = Date.now();
-  const list = (events || (await listEvents(apiKey, fetchImpl))).filter((e) => {
+  const list = (events || (await listEvents(apiKey, fetchImpl, sport))).filter((e) => {
     const t = new Date(e.commence_time).getTime();
     return t > now && t - now < withinHours * 3600 * 1000;
   });
@@ -74,22 +99,22 @@ export async function fetchPrizePicksLines(apiKey, { events, markets = DEFAULT_M
   let remaining = null;
   let used = null;
   for (const e of list) {
-    const url = `${ODDS_BASE}/sports/${SPORT}/events/${e.id}/odds?apiKey=${encodeURIComponent(apiKey)}&bookmakers=${BOOK}&markets=${markets.join(',')}&oddsFormat=american&dateFormat=iso`;
+    const url = `${ODDS_BASE}/sports/${cfg.key}/events/${e.id}/odds?apiKey=${encodeURIComponent(apiKey)}&bookmakers=${BOOK}&markets=${markets.join(',')}&oddsFormat=american&dateFormat=iso`;
     const r = await get(url, fetchImpl);
     remaining = r.remaining ?? remaining;
     used = r.used ?? used;
-    props.push(...parseEventOdds(r.body));
+    props.push(...parseEventOdds(r.body, cfg.markets));
   }
   return { props, remaining: remaining != null ? Number(remaining) : null, used: used != null ? Number(used) : null, events: list.length };
 }
 
 /** Flatten an event-odds response into one row per player/market line. */
-export function parseEventOdds(ev) {
+export function parseEventOdds(ev, markets = MARKETS) {
   const out = new Map();
   for (const bm of ev.bookmakers || []) {
     if (bm.key !== BOOK) continue;
     for (const m of bm.markets || []) {
-      if (!MARKETS[m.key]) continue;
+      if (!markets[m.key]) continue;
       for (const o of m.outcomes || []) {
         if (o.point == null || !o.description) continue;
         const id = `${normName(o.description)}|${m.key}`;

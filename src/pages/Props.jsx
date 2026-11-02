@@ -29,7 +29,7 @@ export const NFL_CFG = {
   boardMinProj: 0.5,
   safeMinProj: 5,
   period: 'week',
-  title: 'PrizePicks Over / Under',
+  title: 'Player Props · Over / Under',
   example: 'Josh Allen, Pass Yards, 245.5\nBijan Robinson Rush Yds 82.5\nPuka Nacua, Receptions, 6.5',
   searchHint: 'Search any player or team (e.g. Josh Allen, Bijan, KC)',
   keyMarkets: {
@@ -87,11 +87,28 @@ export function usePropLines(sport) {
     try { if (k) localStorage.setItem(LS.key, k); else localStorage.removeItem(LS.key); } catch { /* ignore */ }
   };
 
+  // Two published line files: PrizePicks (props.json, needs an Odds API key in the
+  // workflow) and free sportsbook lines from ESPN (lines.json). PrizePicks wins when both
+  // have the same player and stat.
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/${sport === 'nba' ? 'nba/' : ''}props.json`, { cache: 'no-cache' })
-      .then((r) => (r.ok ? r.json() : false))
-      .then((j) => setSnapshot(j && Array.isArray(j.props) ? { ...j, props: withMovement(j.props, LS) } : false))
-      .catch(() => setSnapshot(false));
+    const base = `${import.meta.env.BASE_URL}data/${sport === 'nba' ? 'nba/' : ''}`;
+    const load = (f) => fetch(base + f, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    Promise.all([load('props.json'), load('lines.json')]).then(([pp, book]) => {
+      const files = [pp && Array.isArray(pp.props) ? { ...pp, book: 'PrizePicks' } : null, book && Array.isArray(book.props) ? book : null].filter(Boolean);
+      if (!files.length) { setSnapshot(false); return; }
+      const byId = new Map();
+      for (const f of files) {
+        for (const p of f.props) {
+          if (byId.has(p.id)) continue;
+          byId.set(p.id, { ...p, book: p.book || f.book, prevLine: p.prevLine ?? p.openLine });
+        }
+      }
+      setSnapshot({
+        generatedAt: files.map((f) => f.generatedAt).sort().pop(),
+        books: files.filter((f) => f.props.length).map((f) => f.book),
+        props: withMovement([...byId.values()], LS),
+      });
+    });
   }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refresh = useCallback(async () => {
@@ -128,7 +145,7 @@ export function usePropLines(sport) {
   const lines = [...fetched, ...manualRows.filter((m) => !fetchedIds.has(m.id.slice(2)))];
 
   return {
-    sport, marketsMap, lines, source, asOf, snapshotLoaded: snapshot !== null, live, manual, setManual, apiKey, setApiKey,
+    sport, marketsMap, lines, source, asOf, books: source === 'snapshot' ? snapshot.books : source === 'live' ? ['PrizePicks'] : null, snapshotLoaded: snapshot !== null, live, manual, setManual, apiKey, setApiKey,
     interval, setIntervalPref, markets, setMarkets: (arr) => setMarketsPref(arr.join(',')), refresh, busy, err,
   };
 }
@@ -231,7 +248,7 @@ function PropsBody({ ctx, rows, P }) {
           <h1>{cfg.title}</h1>
           {cfg.HeaderExtra && <cfg.HeaderExtra />}
           <p className="hero-sub">
-            Each line is run through our model: projection, season and recent form, opponent matchup, game script and injuries. The result is a hit probability for the over and the under. Picks need to clear PrizePicks’ ~{Math.round(BREAKEVEN * 1000) / 10}% per-leg break-even to count as an edge.
+            Each line is run through our model: projection, season and recent form, opponent matchup, game script and injuries. The result is a hit probability for the over and the under. Lines are real: DraftKings player props (free, via ESPN) plus PrizePicks when connected. Picks need to clear ~{Math.round(BREAKEVEN * 1000) / 10}% to count as an edge (PrizePicks’ per-leg break-even, about the same as a −118 bet at a sportsbook).
           </p>
         </div>
         <div className="props-status">
@@ -281,7 +298,7 @@ function PropsBody({ ctx, rows, P }) {
                 </div>
               )}
 
-              <div className="section-head"><h2>{P.source ? 'PrizePicks lines' : 'Your saved lines'}</h2><span className="muted small">{evaluated.length} line{evaluated.length === 1 ? '' : 's'}</span></div>
+              <div className="section-head"><h2>{P.source ? `${(P.books || ['PrizePicks']).join(' + ')} lines` : 'Your saved lines'}</h2><span className="muted small">{evaluated.length} line{evaluated.length === 1 ? '' : 's'}</span></div>
               <div className="toolbar">
                 <select value={market} onChange={(e) => setMarket(e.target.value)} aria-label="Stat type">
                   <option value="ALL">All stats</option>
@@ -322,7 +339,7 @@ function PropsBody({ ctx, rows, P }) {
       )}
 
       <p className="disclaimer">
-        Model estimates for research and entertainment only, with no guaranteed outcomes. Gridiron Edge is not affiliated with PrizePicks. Lines come from The Odds API and can lag the app. Always confirm on PrizePicks before entering. Play responsibly. 18+/21+ where legal. Help: 1-800-GAMBLER.
+        Model estimates for research and entertainment only, with no guaranteed outcomes. Gridiron Edge is not affiliated with PrizePicks, DraftKings or ESPN. Sportsbook lines come from ESPN and PrizePicks lines from The Odds API; both can lag the apps, so always confirm the current line before entering. Play responsibly. 18+/21+ where legal. Help: 1-800-GAMBLER.
       </p>
     </div>
   );
@@ -337,7 +354,7 @@ function SourcePill({ P }) {
       </span>
     );
   }
-  if (P.source === 'snapshot') return <span className="source-pill">PrizePicks lines · updated {timeAgo(new Date(P.asOf).getTime())}</span>;
+  if (P.source === 'snapshot') return <span className="source-pill">{(P.books || ['PrizePicks']).join(' + ')} lines · updated {timeAgo(new Date(P.asOf).getTime())}</span>;
   if (P.manual.length) return <span className="source-pill">Manual lines</span>;
   return <span className="source-pill muted">No line source</span>;
 }
@@ -422,6 +439,7 @@ function PropRow({ e }) {
               {e.team && <><TeamLogo abbr={e.team} size={13} /> {e.team}</>}
               {e.opp && <span className="muted">{away ? '@' : 'vs'} {e.opp}</span>}
               {e.manual && <span className="tag tone-neutral">manual</span>}
+              {e.book && !e.manual && <span className={`book-tag ${e.book === 'PrizePicks' ? 'pp' : 'dk'}`}>{e.book}</span>}
             </span>
           </span>
         </span>

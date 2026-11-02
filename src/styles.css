@@ -1291,6 +1291,8 @@ a.tick:hover { box-shadow: var(--glow); }
 .sport-ico.nba { background: radial-gradient(circle at 50% 50%, transparent 45%, rgba(0,0,0,0.35) 46%, transparent 52%), #f97316; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
 .sport-switch button:not(.on) .sport-ico { filter: grayscale(0.6); opacity: 0.7; }
 @media (max-width: 1320px) { .nav span { display: none; } }
+.nav a { white-space: nowrap; }
+@media (max-width: 1560px) { .week-pill { display: none; } .nav a { padding: 7px 10px; } }
 @media (max-width: 860px) { .mobile-nav a span { font-size: 9px; } }
 
 /* ===== NBA extras ======================================================== */
@@ -1453,3 +1455,11 @@ a.tick:hover { box-shadow: var(--glow); }
   .mobile-nav a span { font-size: 8.5px; }
 }
 .tick-head { gap: 8px; }
+.scan-ready { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.scan-ready span { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--surface-3); color: var(--text-3); }
+.scan-ready span.on { background: var(--great-bg); color: var(--great); }
+.sport-tag { display: inline-block; font-size: 10px; font-weight: 900; letter-spacing: 0.06em; padding: 2px 6px; border-radius: 5px; margin-left: 6px; vertical-align: middle; }
+.sport-tag.nfl { background: rgba(139, 90, 43, 0.25); color: #d6a370; }
+.sport-tag.nba { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
+@media (min-width: 861px) { .le-row { grid-template-columns: 22px minmax(160px, 1.4fr) minmax(130px, 1fr) 90px auto auto 56px auto 28px; } }
+.le-row .sport-tag { margin-left: 0; justify-self: start; }

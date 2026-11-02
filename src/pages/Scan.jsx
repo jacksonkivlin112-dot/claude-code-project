@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useData } from '../data.jsx';
+import { DataProvider } from '../data.jsx';
+import { NbaDataProvider } from '../nba/data.jsx';
+import { NBA_CFG, useNbaContext } from '../nba/pages/Props.jsx';
 import { normName } from '../oddsapi.js';
 import { BREAKEVEN } from '../propsModel.js';
 import { parseSlipText } from '../slipParse.js';
@@ -58,13 +60,44 @@ async function runOcr(file, onProgress) {
 
 // ---- Page ------------------------------------------------------------------------
 
-export default function Scan() {
-  return <ScanPage cfg={NFL_CFG} useSportContext={useNflContext} />;
+const CFGS = { nfl: NFL_CFG, nba: NBA_CFG };
+const SPORT_LABEL = { nfl: 'NFL', nba: 'NBA' };
+
+/** Runs one sport's data hook inside its own provider and reports the result up. */
+function Bridge({ use, onChange }) {
+  const v = use();
+  useEffect(() => { onChange(v); }, [v.ctx, v.rows]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
 }
 
-export function ScanPage({ cfg, useSportContext }) {
-  const { ctx, rows } = useSportContext();
-  const roster = useMemo(() => (rows || []).filter((r) => r.pos !== 'K' && r.pos !== 'DEF'), [rows]);
+// Reached from the NFL tab: NFL data comes from the page's provider, NBA is loaded alongside.
+export default function Scan() {
+  const own = useNflContext();
+  return <ScanPage home="nfl" own={own} />;
+}
+
+export function NbaScanRoute() {
+  const own = useNbaContext();
+  return <ScanPage home="nba" own={own} />;
+}
+
+function ScanPage({ home, own }) {
+  const [other, setOther] = useState({ ctx: null, rows: null });
+  const sports = home === 'nfl' ? { nfl: own, nba: other } : { nfl: other, nba: own };
+  const roster = useMemo(
+    () => [
+      ...(sports.nfl.rows || []).filter((r) => r.pos !== 'K' && r.pos !== 'DEF').map((r) => ({ ...r, sport: 'nfl' })),
+      ...(sports.nba.rows || []).map((r) => ({ ...r, sport: 'nba' })),
+    ],
+    [sports.nfl.rows, sports.nba.rows], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const byName = useMemo(() => {
+    const m = new Map();
+    for (const r of roster) if (!m.has(normName(r.name))) m.set(normName(r.name), r);
+    return m;
+  }, [roster]);
+  const sportOf = (l) => l.sport || byName.get(normName(l.player || ''))?.sport || null;
+  const aliasesFor = (p) => CFGS[p.sport]?.aliases;
   const [legs, setLegs] = useState([]);
   const [status, setStatus] = useState(null); // {phase, progress}
   const [preview, setPreview] = useState(null);
@@ -83,13 +116,13 @@ export function ScanPage({ cfg, useSportContext }) {
     try {
       const text = await runOcr(file, (p) => setStatus({ phase: 'Reading screenshot…', progress: p }));
       setRawText(text);
-      const found = parseSlipText(text, roster, cfg.aliases);
+      const found = parseSlipText(text, roster, aliasesFor);
       setLegs(found.length ? found : []);
       setStatus({ phase: found.length ? `Found ${found.length} leg${found.length === 1 ? '' : 's'}` : 'No players recognized. Add the legs below or check the extracted text.', done: true, ok: found.length > 0 });
     } catch (e) {
       setStatus({ phase: `Couldn’t read the image (${e.message}). Add legs manually below.`, done: true, ok: false });
     }
-  }, [roster, cfg.aliases]);
+  }, [roster]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Paste a screenshot straight from the clipboard.
   useEffect(() => {
@@ -102,21 +135,22 @@ export function ScanPage({ cfg, useSportContext }) {
   }, [handleFile]);
 
   const reparse = () => {
-    const found = parseSlipText(rawText, roster, cfg.aliases);
+    const found = parseSlipText(rawText, roster, aliasesFor);
     setLegs(found);
     setStatus({ phase: `Re-read text · ${found.length} leg${found.length === 1 ? '' : 's'}`, done: true, ok: found.length > 0 });
   };
 
-  const analyzed = useMemo(() => {
-    if (!ctx) return [];
-    return legs.map((l, i) => {
-      if (!l.player || !l.market || l.line == null || Number.isNaN(Number(l.line))) return { leg: l, i, incomplete: true };
-      const e = cfg.evaluate({ id: `scan:${i}`, player: l.player, market: l.market, line: Number(l.line) }, ctx);
-      if (!e || e.unmatched || e.mean == null) return { leg: l, i, unmatched: true, e };
-      const prob = l.side === 'under' ? e.pUnder : e.pOver;
-      return { leg: l, i, e, prob };
-    });
-  }, [legs, ctx, cfg]);
+  const analyzed = useMemo(() => legs.map((l, i) => {
+    const sport = sportOf(l);
+    const cfg = CFGS[sport];
+    const ctx = sport ? sports[sport].ctx : null;
+    if (!cfg || !ctx || !l.player || !l.market || !cfg.markets[l.market] || l.line == null || Number.isNaN(Number(l.line))) return { leg: l, i, sport, incomplete: true };
+    const e = cfg.evaluate({ id: `scan:${i}`, player: l.player, market: l.market, line: Number(l.line) }, ctx);
+    if (!e || e.unmatched || e.mean == null) return { leg: l, i, sport, unmatched: true, e };
+    const prob = l.side === 'under' ? e.pUnder : e.pOver;
+    return { leg: l, i, sport, cfg, ctx, e, prob };
+  }), [legs, sports.nfl.ctx, sports.nba.ctx, byName]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ready = { nfl: !!sports.nfl.ctx, nba: !!sports.nba.ctx };
 
   const valid = analyzed.filter((a) => a.prob != null);
   const update = (i, patch) => setLegs((ls) => ls.map((l, k) => (k === i ? { ...l, ...patch } : l)));
@@ -128,11 +162,15 @@ export function ScanPage({ cfg, useSportContext }) {
           <p className="eyebrow">Slip scanner</p>
           <h1>Analyze a PrizePicks Slip</h1>
           <p className="hero-sub">
-            Upload or paste a screenshot of your PrizePicks entry or board. The text is read on your device and never uploaded.
+            Upload or paste a screenshot of your PrizePicks entry or board. <strong>NFL, NBA, or both mixed in one parlay</strong>: each leg is matched to the right sport automatically. The text is read on your device and never uploaded.
             Every leg runs through the full prop model, and the whole slip gets exact odds: chance of each hit count, Power and Flex expected value, break-evens, suggested stake and correlation risk.
           </p>
         </div>
       </div>
+
+      {home === 'nfl'
+        ? <NbaDataProvider><Bridge use={useNbaContext} onChange={setOther} /></NbaDataProvider>
+        : <DataProvider><Bridge use={useNflContext} onChange={setOther} /></DataProvider>}
 
       <section
         className={`scan-drop ${status && !status.done ? 'busy' : ''}`}
@@ -146,6 +184,9 @@ export function ScanPage({ cfg, useSportContext }) {
           <span className="muted small">or paste it (Ctrl/⌘+V), or</span>
           <button type="button" className="btn" onClick={() => inputRef.current?.click()}>Choose image</button>
           <input ref={inputRef} type="file" accept="image/*" hidden onChange={(e) => handleFile(e.target.files?.[0])} />
+          <span className="scan-ready">
+            {['nfl', 'nba'].map((k) => <span key={k} className={ready[k] ? 'on' : ''}>{ready[k] ? '✓' : '…'} {SPORT_LABEL[k]} {ready[k] ? 'ready' : 'loading'}</span>)}
+          </span>
           {status && (
             <div className={`scan-status ${status.done ? (status.ok ? 'ok' : 'warn') : ''}`}>
               {!status.done && <div className="meter"><div className="meter-fill tone-accent" style={{ width: `${Math.round((status.progress || 0) * 100)}%` }} /></div>}
@@ -155,7 +196,7 @@ export function ScanPage({ cfg, useSportContext }) {
         </div>
       </section>
 
-      <LegEditor legs={legs} setLegs={setLegs} update={update} roster={roster} cfg={cfg} analyzed={analyzed} />
+      <LegEditor legs={legs} setLegs={setLegs} update={update} roster={roster} byName={byName} analyzed={analyzed} />
 
       {rawText && (
         <div className="scan-raw">
@@ -169,7 +210,7 @@ export function ScanPage({ cfg, useSportContext }) {
         </div>
       )}
 
-      {!ctx ? (
+      {!ready.nfl && !ready.nba ? (
         <Card><SkeletonRows n={4} h={60} /></Card>
       ) : valid.length === 0 ? (
         <Card><Empty title="Add at least one complete leg">Each leg needs a player, a stat and a line. The analysis appears here instantly.</Empty></Card>
@@ -179,7 +220,7 @@ export function ScanPage({ cfg, useSportContext }) {
           <PayoutAssumptions power={power} setPower={setPower} flex={flex} setFlex={setFlex} />
           <div className="section-head"><h2>Leg-by-leg breakdown</h2><span className="muted small">Every number the model uses for each pick</span></div>
           <div className="leg-cards">
-            {valid.map((a) => <LegCard key={a.i} a={a} cfg={cfg} ctx={ctx} n={valid.length} power={power} />)}
+            {valid.map((a) => <LegCard key={a.i} a={a} home={home} mixed={new Set(valid.map((v) => v.sport)).size > 1} n={valid.length} power={power} />)}
           </div>
         </>
       )}
@@ -193,30 +234,31 @@ export function ScanPage({ cfg, useSportContext }) {
 
 // ---- Leg editor --------------------------------------------------------------------
 
-function LegEditor({ legs, setLegs, update, roster, cfg, analyzed }) {
-  const names = useMemo(() => roster.map((r) => r.name), [roster]);
-  const byName = useMemo(() => new Map(roster.map((r) => [normName(r.name), r])), [roster]);
+function LegEditor({ legs, setLegs, update, roster, byName, analyzed }) {
   return (
     <Card title="Slip legs" subtitle="Check what was read and fix anything that’s off. Changes update the analysis instantly." action={<button type="button" className="btn-ghost" onClick={() => setLegs((l) => [...l, { player: '', market: null, line: null, side: 'over' }])}>+ Add leg</button>}>
       {legs.length === 0 ? (
         <p className="muted small">No legs yet. Upload a screenshot, or add legs by hand.</p>
       ) : (
         <div className="leg-editor">
-          <datalist id="scan-names">{names.map((n) => <option key={n} value={n} />)}</datalist>
+          <datalist id="scan-names">{roster.map((r) => <option key={`${r.sport}${r.id}`} value={r.name}>{SPORT_LABEL[r.sport]} · {r.pos} · {r.team}</option>)}</datalist>
           {legs.map((l, i) => {
             const r = byName.get(normName(l.player || ''));
+            const sport = l.sport || r?.sport;
+            const cfg = CFGS[sport] || NFL_CFG;
             const markets = r ? cfg.marketsFor(r) : Object.keys(cfg.markets);
             const a = analyzed[i];
             return (
               <div key={i} className={`le-row ${a?.unmatched || (l.player && !r) ? 'bad' : ''}`}>
                 <span className="le-n">{i + 1}</span>
-                <input className="le-player" list="scan-names" value={l.player || ''} placeholder="Player" onChange={(e) => update(i, { player: e.target.value })} aria-label={`Leg ${i + 1} player`} />
+                <input className="le-player" list="scan-names" value={l.player || ''} placeholder="Player (NFL or NBA)" onChange={(e) => { const hit = byName.get(normName(e.target.value)); update(i, { player: e.target.value, sport: hit?.sport || null, ...(hit && hit.sport !== l.sport ? { market: null } : {}) }); }} aria-label={`Leg ${i + 1} player`} />
                 <select value={l.market || ''} onChange={(e) => update(i, { market: e.target.value || null })} aria-label={`Leg ${i + 1} stat`}>
                   <option value="">Stat…</option>
                   {markets.map((k) => <option key={k} value={k}>{cfg.markets[k].label}</option>)}
                 </select>
                 <input className="le-line" type="number" step="0.5" min="0" inputMode="decimal" value={l.line ?? ''} placeholder="Line" onChange={(e) => update(i, { line: e.target.value === '' ? null : Number(e.target.value) })} aria-label={`Leg ${i + 1} line`} />
                 <Segmented size="sm" label={`Leg ${i + 1} side`} value={l.side} onChange={(v) => update(i, { side: v })} options={[{ value: 'over', label: 'More' }, { value: 'under', label: 'Less' }]} />
+                {sport && <span className={`sport-tag ${sport}`}>{SPORT_LABEL[sport]}</span>}
                 <span className="le-prob">{a?.prob != null ? <strong className={a.prob >= BREAKEVEN ? 'pos-txt' : 'neg-txt'}>{pct(a.prob, 0)}</strong> : <span className="muted small">{l.player && !r ? 'Not found' : '—'}</span>}</span>
                 {l.confidence != null && <span className={`le-conf ${l.confidence >= 85 ? 'hi' : l.confidence >= 60 ? 'mid' : 'lo'}`} title={`Read from image: ${l.source || ''}`}>{l.confidence}% read</span>}
                 <button type="button" className="le-x" onClick={() => setLegs((ls) => ls.filter((_, k) => k !== i))} aria-label={`Remove leg ${i + 1}`}>×</button>
@@ -255,7 +297,7 @@ function SlipSummary({ legs, stake, setStake, mode, setMode, power, flex }) {
     for (let j = i + 1; j < legs.length; j++) {
       const A = legs[i].e;
       const B = legs[j].e;
-      if (!A.team || !B.team) continue;
+      if (!A.team || !B.team || legs[i].sport !== legs[j].sport) continue;
       if (A.team === B.team) warnings.push({ tone: legs[i].leg.side === legs[j].leg.side ? 'warn' : 'bad', text: `${A.player} and ${B.player} play for ${A.team}. Same-team legs move together, so a bad game script hurts both${legs[i].leg.side !== legs[j].leg.side ? ', and opposite sides partly cancel out' : ''}.` });
       else if (A.opp === B.team) warnings.push({ tone: 'warn', text: `${A.player} (${A.team}) and ${B.player} (${B.team}) are in the same game. Pace and game script link these outcomes.` });
     }
@@ -359,10 +401,10 @@ function PayoutAssumptions({ power, setPower, flex, setFlex }) {
 
 // ---- Leg card ----------------------------------------------------------------------
 
-function LegCard({ a, cfg, ctx, n, power }) {
-  const { e, leg, prob } = a;
+function LegCard({ a, home, mixed, n, power }) {
+  const { e, leg, prob, cfg, ctx } = a;
   const { openPlayer } = useUi();
-  const { gameByTeam } = useData();
+  const gameByTeam = ctx.gameByTeam || {};
   const M = cfg.markets[leg.market];
   const dist = M.dist === 'poisson' || (M.poissonBelow && e.mean < M.poissonBelow) ? 'poisson' : 'normal';
   const sd = e.sd || Math.sqrt(Math.max(e.mean, 0.01));
@@ -383,10 +425,10 @@ function LegCard({ a, cfg, ctx, n, power }) {
   return (
     <article className={`leg-card ${prob >= be ? 'good' : 'bad'}`}>
       <header className="lc-head">
-        <button type="button" className="lc-player" onClick={() => e.playerId && openPlayer(e.playerId)}>
+        <button type="button" className="lc-player" onClick={() => e.playerId && a.sport === home && openPlayer(e.playerId)}>
           <Avatar player={{ id: e.playerId || '0', sport: cfg.sport, pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] }} size={46} />
           <span>
-            <strong>{e.player}</strong>
+            <strong>{e.player}{mixed && <span className={`sport-tag ${a.sport}`}>{SPORT_LABEL[a.sport]}</span>}</strong>
             <small>{e.pos} · {e.team}{e.opp ? ` vs ${e.opp}` : ''}{g ? ` · ${g.state === 'pre' ? kickoff(g.date) : g.state === 'in' ? 'Live' : 'Final'}` : ''}</small>
           </span>
         </button>

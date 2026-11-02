@@ -7,6 +7,7 @@ import { parseNbaSummary } from '../gamecast.js';
 import { buildFeed } from '../../liveFeed.js';
 import LiveFeed from '../../components/LiveFeed.jsx';
 import GameTabs from '../../components/GameTabs.jsx';
+import { FlatScore, GameSwitcher } from '../../components/GameHeader.jsx';
 
 const LIVE_MS = 10000;
 const IDLE_MS = 60000;
@@ -88,15 +89,8 @@ export default function NbaGame({ params }) {
   return (
     <div className="page game-page">
       <div className="game-dock">
-        <div className="game-topline">
-          <a className="back-link" href="#/nba/home">← Tonight</a>
-          <span className="muted small">
-            {game.state === 'in' ? <><span className="live-dot" /> Live · every {LIVE_MS / 1000}s</> : game.state === 'post' ? 'Final' : 'Pregame'}
-            {fetchedAt && ` · ${timeAgo(fetchedAt)}`}
-            {error && ' · reconnecting…'}
-          </span>
-        </div>
-        <Scorebug game={game} color={color} />
+        <GameSwitcher currentId={game.id} sport="nba" back="#/nba/home" />
+        <FlatScore game={game} wp={game.winprob.length ? game.winprob[game.winprob.length - 1].home : null} />
         <GameTabs value={tab} onChange={setTab} tabs={[{ value: 'feed', label: 'Feed' }, { value: 'box', label: 'Box score' }, { value: 'stats', label: 'Stats' }, { value: 'fantasy', label: 'Fantasy' }]} />
       </div>
 

@@ -16,43 +16,57 @@ function Headshot({ a, size = 40, ring }) {
 }
 
 /** One play: big photo, one-line summary, the key stat large on the right. */
+/** Small result marker on the photo: made / missed / turnover. */
+function outcome(i, sport) {
+  if (i.scored) return { cls: 'made', sym: '✓' };
+  if (i.tags.some((t) => /TURNOVER|INTERCEPTION/.test(t.label)) || /turnover/i.test(i.type)) return { cls: 'to', sym: '↺' };
+  if (sport === 'nba' && /misses/i.test(i.text)) return { cls: 'miss', sym: '✕' };
+  if (sport === 'nfl' && /incomplete/i.test(i.text)) return { cls: 'miss', sym: '✕' };
+  if (/field goal/i.test(i.type) && /no good|missed|blocked/i.test(i.type + i.text)) return { cls: 'miss', sym: '✕' };
+  return null;
+}
+
+/** One play as a flat, full-width row: score/clock, play line, running stats. */
 export function PlayCard({ item: i, game, color, sport, fresh, open, onToggle, gameTag }) {
   const tc = i.team === game.home.abbr ? color(game.home) : i.team === game.away.abbr ? color(game.away) : 'var(--accent)';
-  const lead = i.actors[0];
-  const second = i.actors[1];
+  // Photo follows the headline player (the receiver on a catch, not the passer).
+  const lead = (i.after?.[0] && i.actors.find((a) => String(a.id) === String(i.after[0].id))) || i.actors[0];
   const swing = i.wpDelta != null && Math.abs(i.wpDelta) >= 0.03 ? i.wpDelta : null;
   const swingTeam = swing != null ? (swing > 0 ? game.home.abbr : game.away.abbr) : null;
-  const extraTags = i.tags.slice(i.big ? 1 : 0).filter((t) => t.label !== 'MOMENTUM' || !i.big);
+  const extraTags = i.tags.slice(i.big ? 1 : 0).filter((t) => t.label !== 'MOMENTUM' && t.label !== 'FLAG');
+  const oc = outcome(i, sport);
+  const label = i.big && i.tags[0] ? i.tags[0] : null;
   return (
-    <article className={`lf-card ${i.big ? 'big' : ''} ${i.scored ? 'scored' : ''} ${fresh ? 'new' : ''}`} style={{ '--tc': tc }}>
-      {i.big && i.tags[0] && <div className={`lf-banner tone-${i.tags[0].tone}`}>{i.tags[0].label}</div>}
+    <article className={`lf-card ${i.big ? 'big' : ''} ${fresh ? 'new' : ''}`} style={{ '--tc': tc }}>
       <button type="button" className="lf-row" onClick={onToggle} aria-expanded={open}>
         <span className="lf-faces">
-          {lead ? <Headshot a={lead} size={i.big ? 76 : 58} ring={tc} /> : <span className="lf-teamface"><TeamLogo abbr={i.team} size={i.big ? 52 : 40} /></span>}
-          {second && <Headshot a={second} size={i.big ? 40 : 32} ring={tc} />}
+          {lead ? <Headshot a={lead} size={58} ring={tc} /> : <span className="lf-teamface">{i.team ? <TeamLogo abbr={i.team} size={40} /> : <span className="lf-glyph" aria-hidden>{sport === 'nba' ? '◷' : '⚑'}</span>}</span>}
+          {lead && i.team && <span className="lf-tbadge"><TeamLogo abbr={i.team} size={18} /></span>}
+          {oc && <span className={`lf-oc ${oc.cls}`}>{oc.sym}</span>}
         </span>
         <span className="lf-body">
-          {gameTag}
+          <span className="lf-meta">
+            {gameTag || (
+              <span className="lf-sc">
+                <TeamLogo abbr={game.away.abbr} size={14} /> {i.awayScore ?? '–'}-{i.homeScore ?? '–'} <TeamLogo abbr={game.home.abbr} size={14} />
+              </span>
+            )}
+            <span>{Q(i.period)} {i.clock}{i.dd ? ` · ${i.dd}` : ''}</span>
+          </span>
+          {label && <span className={`lf-label tone-${label.tone}`}>{label.label}</span>}
           <strong className="lf-sum">{summarize(i, sport)}</strong>
-          <span className="lf-time"><TeamLogo abbr={i.team} size={14} /> {Q(i.period)} {i.clock}{i.dd ? ` · ${i.dd}` : ''}</span>
           {i.after?.length > 0 && (
             <span className="lf-after">
-              {i.after.map((x) => <span key={x.name}><b>{x.name}:</b> {x.line}</span>)}
+              {i.after.map((x) => <span key={x.name}><b>{x.name}</b> · {x.line}</span>)}
             </span>
           )}
-          {(extraTags.length > 0 || swing != null) && (
-            <span className="lf-chips">
-              {extraTags.map((t) => <span key={t.label} className={`tag tone-${t.tone}`}>{t.label}</span>)}
-              {swing != null && <span className={`lf-swing ${Math.abs(swing) >= 0.08 ? 'hot' : ''}`} title="Change in win probability on this play">{swing > 0 ? '▲' : '▼'} {Math.abs(Math.round(swing * 100))}% {swingTeam}</span>}
-            </span>
-          )}
+          {extraTags.length > 0 && <span className="lf-chips">{extraTags.map((t) => <span key={t.label} className={`lf-chip tone-${t.tone}`}>{t.label}</span>)}</span>}
         </span>
-        {i.scored ? (
-          <span className="lf-key score">
-            <span>{game.away.abbr} <b>{i.awayScore}</b></span>
-            <span>{game.home.abbr} <b>{i.homeScore}</b></span>
+        {swing != null && (
+          <span className={`lf-wp ${swing > 0 ? 'home' : 'away'}`} title="Change in win probability on this play">
+            {swing > 0 ? '▲' : '▼'} {Math.abs(Math.round(swing * 100))}%<small>{swingTeam}</small>
           </span>
-        ) : null}
+        )}
       </button>
       {open && <p className="lf-text">{i.text}</p>}
     </article>

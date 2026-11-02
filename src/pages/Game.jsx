@@ -5,6 +5,7 @@ import { parseSummary } from '../gamecast.js';
 import { buildFeed } from '../liveFeed.js';
 import LiveFeed from '../components/LiveFeed.jsx';
 import GameTabs from '../components/GameTabs.jsx';
+import { FlatScore, GameSwitcher } from '../components/GameHeader.jsx';
 import { useProjectionRows } from '../components/players.jsx';
 import { Avatar, Card, Empty, Segmented, SkeletonRows, TeamLogo, f1, kickoff, timeAgo, useNow, useUi } from '../components/ui.jsx';
 
@@ -96,15 +97,8 @@ export default function Game({ params }) {
   return (
     <div className="page game-page">
       <div className="game-dock">
-        <div className="game-topline">
-          <a className="back-link" href="#/home">← Week</a>
-          <span className="muted small">
-            {game.state === 'in' ? <><span className="live-dot" /> Live · every {LIVE_MS / 1000}s</> : game.state === 'post' ? 'Final' : 'Pregame'}
-            {fetchedAt && ` · ${timeAgo(fetchedAt)}`}
-            {error && ' · reconnecting…'}
-          </span>
-        </div>
-        <Scorebug game={game} color={color} />
+        <GameSwitcher currentId={game.id} sport="nfl" back="#/home" />
+        <FlatScore game={game} wp={game.winprob.length ? game.winprob[game.winprob.length - 1].home : null} />
         <GameTabs
           value={tab}
           onChange={setTab}

@@ -52,9 +52,10 @@ const SIDE_UNDER = /\b(less|lower|under)\b|▼|↓/i;
 /**
  * @param text    raw OCR text
  * @param roster  [{ name, ... }] players with projections
- * @param aliases market alias table for matchMarket
+ * @param aliases market alias table, or (player) => table for mixed-sport slips
  */
 export function parseSlipText(text, roster, aliases) {
+  const tableFor = typeof aliases === 'function' ? aliases : () => aliases;
   const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
   const hits = [];
   lines.forEach((l, i) => {
@@ -70,7 +71,7 @@ export function parseSlipText(text, roster, aliases) {
     let mk = null;
     let line = null;
     for (const l of windowLines) {
-      if (!mk) mk = matchMarket(clean(l), aliases);
+      if (!mk) mk = matchMarket(clean(l), tableFor(h.p));
       if (line == null) {
         const nums = [...l.replace(/\d{1,2}:\d{2}/g, ' ').replace(/#\d+/g, ' ').replace(/\$\d+(\.\d+)?/g, ' ').matchAll(/(?<![\w.])(\d{1,3}(?:\.\d)?)(?![\d%:])/g)].map((x) => parseFloat(x[1]));
         const half = nums.find((x) => Math.abs((x % 1) - 0.5) < 1e-6);
@@ -84,10 +85,11 @@ export function parseSlipText(text, roster, aliases) {
     }
     const win = windowLines.join(' ');
     const side = SIDE_UNDER.test(win) && !SIDE_OVER.test(win) ? 'under' : 'over';
-    const key = `${normName(h.p.name)}|${mk?.key}`;
+    const key = `${h.p.sport || ''}|${normName(h.p.name)}|${mk?.key}`;
     if (seen.has(key)) return;
     seen.add(key);
     legs.push({
+      sport: h.p.sport || null,
       player: h.p.name,
       market: mk?.key || null,
       line,

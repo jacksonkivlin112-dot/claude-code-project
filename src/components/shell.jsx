@@ -5,11 +5,11 @@ import { FORMATS } from '../model.js';
 import { Segmented, TeamLogo, kickoff, timeAgo, useNow, useUi } from './ui.jsx';
 
 const NBA_NAV = [
-  { path: 'home', label: 'Tonight', icon: 'M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z' },
+  { path: 'home', label: 'Tonight', short: 'Tonight', icon: 'M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z' },
   { path: 'projections', label: 'Projections', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
   { path: 'props', label: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
-  { path: 'scan', label: 'Slip Scan', icon: 'M3 7h3l2-3h8l2 3h3v13H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
-  { path: 'stats', label: 'Season Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
+  { path: 'scan', label: 'Slip Scan', short: 'Scan', icon: 'M3 7h3l2-3h8l2 3h3v13H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
+  { path: 'stats', label: 'Season Stats', short: 'Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
   { path: 'teams', label: 'Teams', icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
   { path: 'matchups', label: 'Matchups', icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
 ];
@@ -18,11 +18,11 @@ const navFor = (sport) => (sport === 'nba' ? NBA_NAV : NAV);
 const href = (sport, path) => `#/${sport === 'nba' ? 'nba/' : ''}${path}`;
 
 const NAV = [
-  { path: 'home', label: 'This Week', icon: 'M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10' },
+  { path: 'home', label: 'This Week', short: 'Week', icon: 'M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10' },
   { path: 'projections', label: 'Projections', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
   { path: 'props', label: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
-  { path: 'scan', label: 'Slip Scan', icon: 'M3 7h3l2-3h8l2 3h3v13H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
-  { path: 'stats', label: 'Season Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
+  { path: 'scan', label: 'Slip Scan', short: 'Scan', icon: 'M3 7h3l2-3h8l2 3h3v13H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
+  { path: 'stats', label: 'Season Stats', short: 'Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
   { path: 'teams', label: 'Teams', icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
   { path: 'matchups', label: 'Matchups', icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
 ];
@@ -93,9 +93,9 @@ export function Header({ route }) {
         )}
         <nav className="nav" aria-label="Primary">
           {nav.map((n) => (
-            <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''} aria-current={route.path === n.path ? 'page' : undefined}>
+            <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''} aria-current={route.path === n.path ? 'page' : undefined} title={n.label}>
               <Icon d={n.icon} size={16} />
-              <span>{n.label}</span>
+              <span>{n.short || n.label}</span>
             </a>
           ))}
         </nav>

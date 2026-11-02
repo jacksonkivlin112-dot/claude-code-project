@@ -29,9 +29,17 @@ export function NbaDataProvider({ children }) {
       const seasonStart = state.season_start_date || `${season}-10-20`;
       setSnap(snapshot);
 
-      // Default slate: today (ET), or the next day with games.
+      // Default slate: today (ET). Once every game today is final, jump to the next night with games.
       let d = etDate();
-      for (let i = 0; i < 10 && !snapshot.games.some((g) => etDate(g.date) === d); i++) d = addDays(d, 1);
+      const onDay = (x) => snapshot.games.filter((g) => etDate(g.date) === x);
+      const allDone = (x) => { const gs = onDay(x); return gs.length > 0 && gs.every((g) => g.state === 'post'); };
+      if (allDone(d)) {
+        // The snapshot can lag a few minutes; also treat games that tipped off 3.5h+ ago as done.
+        d = addDays(d, 1);
+      } else if (onDay(d).length && onDay(d).every((g) => g.state === 'post' || Date.now() - new Date(g.date).getTime() > 3.5 * 3600000)) {
+        d = addDays(d, 1);
+      }
+      for (let i = 0; i < 10 && !onDay(d).length; i++) d = addDays(d, 1);
       const label = `${season}-${String(season + 1).slice(2)}`;
       setCore({ season, week, seasonStart, sport: 'nba', label });
 

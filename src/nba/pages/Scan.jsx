@@ -1,6 +1,5 @@
-import { ScanPage } from '../../pages/Scan.jsx';
-import { NBA_CFG, useNbaContext } from './Props.jsx';
+import { NbaScanRoute } from '../../pages/Scan.jsx';
 
 export default function NbaScan() {
-  return <ScanPage cfg={NBA_CFG} useSportContext={useNbaContext} />;
+  return <NbaScanRoute />;
 }

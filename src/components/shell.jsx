@@ -119,7 +119,7 @@ export function Ticker() {
   return (
     <div className="ticker" role="list" aria-label="Scores">
       {games.map((g) => (
-        <div key={g.id} role="listitem" className={`tick ${g.state} ${g.redZone ? 'rz' : ''}`}>
+        <a key={g.id} role="listitem" href={`#/game?id=${g.id}`} className={`tick ${g.state} ${g.redZone ? 'rz' : ''}`} title={`${g.away.abbr} @ ${g.home.abbr}: open Game Center`}>
           <div className="tick-head">
             <GameStatus g={g} />
             {g.tv && <span className="tv">{g.tv}</span>}
@@ -127,17 +127,17 @@ export function Ticker() {
           {[g.away, g.home].map((s) => {
             const lost = g.state === 'post' && !s.winner;
             return (
-              <button type="button" key={s.abbr} className={`tick-row ${lost ? 'lost' : ''}`} onClick={() => openTeam(s.abbr)}>
+              <span key={s.abbr} className={`tick-row ${lost ? 'lost' : ''}`}>
                 <TeamLogo abbr={s.abbr} size={20} />
                 <span className="abbr">{s.abbr}</span>
                 {g.possession && g.state === 'in' && g.possession === s.abbr && <span className="poss" title="Possession" />}
                 <span className="rec">{g.state === 'pre' ? s.record : ''}</span>
                 <span className="score">{g.state === 'pre' ? '' : s.score}</span>
-              </button>
+              </span>
             );
           })}
           {g.state === 'in' && g.downDistance && <div className="tick-foot">{g.redZone && <b>RZ </b>}{g.downDistance}</div>}
-        </div>
+        </a>
       ))}
       {board.source === 'snapshot' && board.asOf && (
         <div className="tick asof" title="Live scores unavailable in this browser; showing the latest scheduled snapshot">

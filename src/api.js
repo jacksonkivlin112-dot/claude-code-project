@@ -171,7 +171,7 @@ export function getSnapshot() {
   );
 }
 
-async function fetchWithTimeout(url, ms) {
+export async function fetchWithTimeout(url, ms) {
   const ctl = new AbortController();
   const id = setTimeout(() => ctl.abort(), ms);
   try {
@@ -243,3 +243,11 @@ export const headshot = (p) =>
   p.pos === 'DEF'
     ? `https://sleepercdn.com/images/team_logos/nfl/${p.id.toLowerCase()}.png`
     : `https://sleepercdn.com/content/nfl/players/thumb/${p.id}.jpg`;
+
+/**
+ * Live game feed (drives, plays, win probability, box score) for Game Center.
+ * Fetched straight from ESPN; real browsers are allowed cross-origin access.
+ */
+export async function getGameSummary(eventId) {
+  return fetchWithTimeout(`${ESPN_LIVE}/site/v2/sports/football/nfl/summary?event=${encodeURIComponent(eventId)}&_=${Math.floor(Date.now() / 10000)}`, 9000);
+}

@@ -2,6 +2,7 @@ import { DataProvider, useData, useRoute } from './data.jsx';
 import { Overlay } from './components/panels.jsx';
 import { Header, MobileNav, Ticker } from './components/shell.jsx';
 import { UiProvider, timeAgo, useNow } from './components/ui.jsx';
+import Game from './pages/Game.jsx';
 import Home from './pages/Home.jsx';
 import Matchups from './pages/Matchups.jsx';
 import Projections from './pages/Projections.jsx';
@@ -9,7 +10,7 @@ import Props from './pages/Props.jsx';
 import Stats from './pages/Stats.jsx';
 import Teams from './pages/Teams.jsx';
 
-const PAGES = { home: Home, projections: Projections, props: Props, stats: Stats, teams: Teams, matchups: Matchups };
+const PAGES = { home: Home, game: Game, projections: Projections, props: Props, stats: Stats, teams: Teams, matchups: Matchups };
 
 function Shell() {
   const route = useRoute();
@@ -29,7 +30,7 @@ function Shell() {
             <button type="button" className="btn" onClick={reload}>Retry</button>
           </div>
         )}
-        <Page key={route.path} params={route.params} />
+        <Page key={route.path + (route.params.get('id') || '')} params={route.params} />
       </main>
       <footer className="footer">
         <span>

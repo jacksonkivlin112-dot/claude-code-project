@@ -197,6 +197,9 @@ function GameCard({ g, outlook }) {
         ) : null}
         {g.state === 'pre' && g.venue && <span className="venue">{g.venue}{g.city ? ` · ${g.city}` : ''}</span>}
       </footer>
+      <a className={`gc-link ${g.state}`} href={`#/game?id=${g.id}`}>
+        {g.state === 'in' ? <><span className="live-dot" /> Live play-by-play</> : g.state === 'post' ? 'Recap & play-by-play' : 'Game preview'} →
+      </a>
     </article>
   );
 }

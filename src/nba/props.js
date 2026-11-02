@@ -201,7 +201,7 @@ export function evaluateNbaProp(prop, ctx) {
   };
 }
 
-const NBA_ALIASES = [
+export const NBA_ALIASES = [
   ['player_points_rebounds_assists', ['pts+rebs+asts', 'pts+reb+ast', 'points+rebounds+assists', 'pra']],
   ['player_points_rebounds', ['pts+rebs', 'pts+reb', 'points+rebounds', 'p+r', 'pr']],
   ['player_points_assists', ['pts+asts', 'pts+ast', 'points+assists', 'p+a', 'pa']],

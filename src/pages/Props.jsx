@@ -134,7 +134,7 @@ function usePropLines(sport) {
 const GRADE_ORDER = { strong: 3, solid: 2, lean: 1, pass: 0 };
 
 /** NFL: projections, season logs and the team model feed the prop model. */
-function useNflContext() {
+export function useNflContext() {
   const { core, season, ranks, liveById, gameByTeam, teams } = useData();
   const rows = useProjectionRows(core?.week);
   const outlook = useTeamOutlook();

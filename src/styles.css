@@ -1806,7 +1806,7 @@ a.tick:hover { box-shadow: var(--glow); }
 @media (max-width: 860px) { .lf-after { font-size: 13px; } .lf-after span + span { font-size: 12px; } }
 
 /* ===== Pure black, seamless ============================================== */
-:root, [data-theme='dark'] {
+:root:not([data-theme='light']) {
   --bg: #000000;
   --bg-grad: radial-gradient(900px 420px at 8% -12%, rgba(124, 58, 237, 0.12), transparent 60%);
   --surface: #0b0b0e;
@@ -1819,7 +1819,7 @@ a.tick:hover { box-shadow: var(--glow); }
   --text-3: #74747f;
   --shadow: none;
 }
-[data-theme='dark'] .topbar, :root:not([data-theme='light']) .topbar { background: rgba(0, 0, 0, 0.82); }
+:root:not([data-theme='light']) .topbar { background: rgba(0, 0, 0, 0.82); }
 
 /* Game header: back + game strip, flat scoreboard, flat tabs */
 .game-dock { background: #000; border-bottom: 1px solid var(--border); gap: 4px; }
@@ -1995,3 +1995,40 @@ a.tick:hover { box-shadow: var(--glow); }
   .rec-big { font-size: 32px; }
   .slipc-leg { padding: 12px 14px; }
 }
+
+/* ===== Game props tab, favorites, light-mode fixes ======================== */
+.game-tabs button { white-space: nowrap; }
+@media (max-width: 860px) { .game-tabs button { font-size: 15px; padding: 12px 4px 13px; } }
+.fav-star { margin-left: 6px; font-size: 15px; color: var(--text-3); cursor: pointer; }
+.fav-star.on { color: #fbbf24; }
+.gs-card.fav { box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.45); }
+.gp { display: flex; flex-direction: column; gap: 18px; padding-top: 12px; }
+.gp-h { display: flex; align-items: baseline; gap: 10px; font-size: 18px; font-weight: 800; margin: 0 0 6px; }
+.gp-h small { font-size: 12px; font-weight: 700; color: var(--text-3); }
+.gp-empty { margin: 0; }
+.gp-list { list-style: none; margin: 0 -24px; padding: 0; border-top: 1px solid var(--border); }
+.gp-row { display: grid; grid-template-columns: 50px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 24px; border-bottom: 1px solid var(--border); }
+.gp-av { position: relative; width: 46px; height: 46px; padding: 0; background: none; border: 0; }
+.gp-av .lf-oc { left: auto; right: -6px; bottom: -4px; width: 20px; height: 20px; font-size: 11px; }
+.gp-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gp-main strong { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gp-pick { font-size: 14px; font-weight: 700; color: var(--text-2); }
+.gp-pick small { color: var(--text-3); font-weight: 600; }
+.gp-val { display: flex; flex-direction: column; align-items: flex-end; min-width: 54px; font-variant-numeric: tabular-nums; }
+.gp-val b { font-family: var(--font-display); font-size: 24px; font-weight: 800; line-height: 1; }
+.gp-val small { font-size: 11px; color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.gp-row.hit .gp-val b { color: var(--great); }
+.gp-row.miss .gp-val b { color: #ff6b70; }
+.gp-save { display: flex; justify-content: center; padding-top: 12px; }
+@media (max-width: 860px) { .gp-list { margin: 0 -16px; } .gp-row { padding: 12px 16px; } }
+
+[data-theme='light'] .lf-tbadge, [data-theme='light'] .lf-oc { box-shadow: 0 0 0 2px var(--bg); }
+[data-theme='light'] .lf-tbadge { background: var(--bg); }
+[data-theme='light'] .lf-card:hover { background: rgba(0, 0, 0, 0.03); }
+[data-theme='light'] .lf-faces .lf-head { background: color-mix(in srgb, var(--tc) 22%, #fff); }
+
+.game-tabs button { min-width: 0; }
+@media (max-width: 860px) { .game-tabs { gap: 0; } .game-tabs button { font-size: 14px; padding: 12px 2px 13px; } }
+.gp-h { font-family: var(--font-body); text-transform: none; letter-spacing: -0.01em; font-style: normal; }
+[data-theme='light'] .gsw-back { background: var(--surface-2); }
+[data-theme='light'] .lf-card.new { animation: lfIn 0.45s ease; }

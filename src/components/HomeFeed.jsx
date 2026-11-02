@@ -6,6 +6,7 @@ import { buildFeed } from '../liveFeed.js';
 import { getNbaSummary } from '../nba/api.js';
 import { parseNbaSummary } from '../nba/gamecast.js';
 import { PlayCard } from './LiveFeed.jsx';
+import { favoriteRank, useFavorites } from '../favorites.js';
 import { TeamLogo, kickoff } from './ui.jsx';
 
 const lum = (hex = '#000000') => {
@@ -41,10 +42,11 @@ export default function HomeFeed({ sport, rail = true }) {
     return lum(c) < 0.16 && a && lum(a) > lum(c) && lum(a) < 0.92 ? a : c;
   };
 
+  const [favs] = useFavorites(sport);
   const games = useMemo(() => {
     const order = { in: 0, pre: 1, post: 2 };
-    return [...board.games].sort((a, b) => order[a.state] - order[b.state] || (a.state === 'post' ? new Date(b.date) - new Date(a.date) : new Date(a.date) - new Date(b.date)));
-  }, [board.games]);
+    return [...board.games].sort((a, b) => order[a.state] - order[b.state] || favoriteRank(b, favs) - favoriteRank(a, favs) || (a.state === 'post' ? new Date(b.date) - new Date(a.date) : new Date(a.date) - new Date(b.date)));
+  }, [board.games, favs]);
   const live = games.filter((g) => g.state === 'in');
   const targets = (live.length ? live : games.filter((g) => g.state === 'post').slice(0, 4)).slice(0, MAX_GAMES);
   const targetKey = targets.map((g) => g.id).join(',');

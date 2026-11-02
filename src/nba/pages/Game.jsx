@@ -4,6 +4,8 @@ import { Avatar, Card, Empty, Segmented, SkeletonRows, TeamLogo, f1, kickoff, ti
 import { getNbaSummary } from '../api.js';
 import { useNbaRows } from '../components.jsx';
 import { parseNbaSummary } from '../gamecast.js';
+import { buildFeed } from '../../liveFeed.js';
+import LiveFeed from '../../components/LiveFeed.jsx';
 
 const LIVE_MS = 10000;
 const IDLE_MS = 60000;
@@ -28,7 +30,9 @@ function useNbaGame(id) {
     };
     const tick = async () => {
       try {
-        const g = parseNbaSummary(await getNbaSummary(id));
+        const raw = await getNbaSummary(id);
+        const g = parseNbaSummary(raw);
+        g.feed = buildFeed(g, raw, 'nba');
         if (!alive) return;
         setGame(g);
         setError(null);
@@ -52,7 +56,7 @@ export default function NbaGame({ params }) {
   const id = params.get('id');
   const { board, teams } = useData();
   const { game, error, fetchedAt } = useNbaGame(id);
-  const [tab, setTab] = useState('plays');
+  const [tab, setTab] = useState('feed');
   useNow(5000);
   const fallback = board.games.find((g) => g.id === id);
 
@@ -102,7 +106,8 @@ export default function NbaGame({ params }) {
       )}
       <div className="game-grid">
         <div className="game-main">
-          <Segmented label="Game view" value={tab} onChange={setTab} options={[{ value: 'plays', label: 'Play-by-play' }, { value: 'box', label: 'Box score' }, { value: 'fantasy', label: 'Fantasy' }]} />
+          <Segmented label="Game view" value={tab} onChange={setTab} options={[{ value: 'feed', label: 'Live feed' }, { value: 'plays', label: 'Play-by-play' }, { value: 'box', label: 'Box score' }, { value: 'fantasy', label: 'Fantasy' }]} />
+          {tab === 'feed' && <LiveFeed feed={game.feed} game={game} color={color} sport="nba" />}
           {tab === 'plays' && <PlayByPlay game={game} color={color} />}
           {tab === 'box' && <BoxScore game={game} />}
           {tab === 'fantasy' && <GameFantasy game={game} />}

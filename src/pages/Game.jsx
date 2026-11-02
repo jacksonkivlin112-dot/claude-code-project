@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getGameSummary } from '../api.js';
 import { useData } from '../data.jsx';
 import { parseSummary } from '../gamecast.js';
+import { buildFeed } from '../liveFeed.js';
+import LiveFeed from '../components/LiveFeed.jsx';
 import { useProjectionRows } from '../components/players.jsx';
 import { Avatar, Card, Empty, Segmented, SkeletonRows, TeamLogo, f1, kickoff, timeAgo, useNow, useUi } from '../components/ui.jsx';
 
@@ -25,7 +27,9 @@ function useGame(id) {
     setError(null);
     const tick = async () => {
       try {
-        const g = parseSummary(await getGameSummary(id));
+        const raw = await getGameSummary(id);
+        const g = parseSummary(raw);
+        g.feed = buildFeed(g, raw, 'nfl');
         if (!alive) return;
         setGame(g);
         setError(null);
@@ -57,7 +61,7 @@ export default function Game({ params }) {
   const id = params.get('id');
   const { board, teams } = useData();
   const { game, error, fetchedAt } = useGame(id);
-  const [tab, setTab] = useState('plays');
+  const [tab, setTab] = useState('feed');
   useNow(5000);
   const fallback = board.games.find((g) => g.id === id);
 
@@ -109,12 +113,14 @@ export default function Game({ params }) {
             value={tab}
             onChange={setTab}
             options={[
-              { value: 'plays', label: 'Play-by-play' },
+              { value: 'feed', label: 'Live feed' },
+              { value: 'plays', label: 'Drives' },
               { value: 'scoring', label: 'Scoring' },
               { value: 'box', label: 'Box score' },
               { value: 'fantasy', label: 'Fantasy' },
             ]}
           />
+          {tab === 'feed' && <LiveFeed feed={game.feed} game={game} color={color} sport="nfl" />}
           {tab === 'plays' && <PlayByPlay game={game} color={color} />}
           {tab === 'scoring' && <Scoring game={game} />}
           {tab === 'box' && <BoxScore game={game} />}

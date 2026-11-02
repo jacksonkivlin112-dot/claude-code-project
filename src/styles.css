@@ -1568,3 +1568,8 @@ a.tick:hover { box-shadow: var(--glow); }
   .lf-scorebox { grid-column: 2; flex-direction: row; gap: 10px; justify-self: start; }
   .lf-who { flex-direction: column; gap: 1px; }
 }
+.lf-main { display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%; }
+.lf-sum { font-size: 16px; font-weight: 800; line-height: 1.25; letter-spacing: -0.01em; }
+.lf-card.big .lf-sum { font-size: 19px; }
+.lf-main .lf-time { font-size: 11px; }
+.lf-text { animation: fade 0.2s ease; padding-top: 4px; border-top: 1px dashed var(--border); margin-top: 4px; }

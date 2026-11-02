@@ -162,3 +162,106 @@ export function buildFeed(game, raw, sport) {
   }
   return { items: items.reverse(), athletes };
 }
+
+// ---- Short play summaries ------------------------------------------------------
+// "K. Walker 7 yd rush" instead of the full official play description.
+
+const short = (a) => {
+  if (!a?.name) return '';
+  const parts = a.name.replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/i, '').split(' ');
+  return parts.length > 1 ? `${parts[0][0]}. ${parts.slice(1).join(' ')}` : a.name;
+};
+// "R.Rice" / "J.Smith-Njigba" in raw NFL text -> "R. Rice"
+const fmtAbbr = (s) => (s ? s.replace(/^([A-Z][a-z]{0,2})\.\s?/, '$1. ') : '');
+const yds = (n) => (n === 0 ? 'no gain' : `${Math.abs(n)} yd${Math.abs(n) === 1 ? '' : 's'}`);
+
+function nflSummary(i) {
+  const t = i.text || '';
+  const type = i.type || '';
+  const [A, B] = i.actors;
+  const a = short(A);
+  const b = short(B);
+  const y = i.yards ?? 0;
+  const num = (re) => { const m = t.match(re); return m ? Number(m[1]) : null; };
+  if (/two-minute warning/i.test(type)) return 'Two-minute warning';
+  if (/end (of )?(period|half|game|regulation)/i.test(type)) return type;
+  if (/timeout/i.test(type)) return `Timeout${i.team ? ` ${i.team}` : ''}`;
+  if (/penalty/i.test(type)) {
+    const m = t.match(/PENALTY on ([A-Z]{2,3})-[^,]+,\s*([^,]+?),\s*(\d+)\s*yards?/i);
+    if (m) return `Flag on ${m[1]}: ${m[2].trim()}, ${m[3]} yds`;
+    const d = t.match(/PENALTY on ([A-Z]{2,3})[^,]*,\s*([^,.]+)/i);
+    return d ? `Flag on ${d[1]}: ${d[2].trim()}${/declined/i.test(t) ? ' (declined)' : /offsetting/i.test(t) ? ' (offsetting)' : ''}` : 'Penalty';
+  }
+  if (/field goal/i.test(type)) {
+    const d = num(/(\d+)\s*(?:yard|yd)s?\s*field goal/i);
+    return `${a || 'FG'} ${d ? `${d} yd ` : ''}FG ${/good/i.test(type) ? 'is good' : /block/i.test(type + t) ? 'blocked' : 'missed'}`;
+  }
+  if (/extra point|two-point/i.test(type)) return `${a || 'Try'} ${/good|succeed/i.test(type + t) ? 'converts' : 'fails'} ${/two-point/i.test(type) ? '2-pt try' : 'PAT'}`;
+  if (/punt/i.test(type)) { const d = num(/punts\s+(\d+)\s+yards/i); return `Punt${d ? `, ${d} yds` : ''}${/fair catch/i.test(t) ? ' (fair catch)' : /touchback/i.test(t) ? ' (touchback)' : ''}`; }
+  if (/kickoff/i.test(type)) {
+    if (/touchback/i.test(t)) return 'Kickoff, touchback';
+    const r = num(/for\s+(-?\d+)\s+yards?/i);
+    return r != null && b ? `${b} ${r} yd kick return` : 'Kickoff';
+  }
+  if (/sack/i.test(type)) return `${a || 'QB'} sacked${y ? `, ${y} yds` : ''}`;
+  if (/interception/i.test(type) || /INTERCEPTED/.test(t)) {
+    const by = t.match(/INTERCEPTED by ([A-Z][a-zA-Z]{0,2}\.\s?[A-Z][A-Za-z'’-]+)/);
+    return `${a || 'Pass'} intercepted${by ? ` by ${fmtAbbr(by[1])}` : ''}${/touchdown/i.test(type + t) ? ', returned for TD' : ''}`;
+  }
+  if (/fumble/i.test(type) || /FUMBLES/.test(t)) {
+    const rec = t.match(/RECOVERED by ([A-Z]{2,3})/i);
+    return `${a || 'Ball'} fumbles${rec ? `, recovered by ${rec[1].toUpperCase()}` : ''}`;
+  }
+  if (/passing touchdown/i.test(type)) return `${a} ${y ? `${y} yd ` : ''}TD pass${b ? ` to ${b}` : ''}`;
+  if (/rushing touchdown/i.test(type)) return `${a} ${y ? `${y} yd ` : ''}TD run`;
+  if (/pass incompletion/i.test(type) || /pass incomplete/i.test(t)) return `${a} incomplete${b ? ` to ${b}` : ''}`;
+  if (/pass reception|pass$/i.test(type) || / pass (short|deep)/i.test(t)) return b ? `${b} ${y === 0 ? 'catch, no gain' : y < 0 ? `catch, loss of ${-y}` : `${y} yd catch`} from ${A?.name?.split(' ').slice(-1)[0] || ''}`.trim() : `${a} pass, ${yds(y)}`;
+  if (/rush|scramble/i.test(type)) return `${a} ${y === 0 ? 'rush, no gain' : y < 0 ? `rush, loss of ${Math.abs(y)}` : `${y} yd rush`}`;
+  return a ? `${a} ${type.toLowerCase()}`.trim() : type || t.slice(0, 60);
+}
+
+function nbaSummary(i) {
+  const t = i.text || '';
+  const type = i.type || '';
+  const [A, B] = i.actors;
+  const a = short(A) || (t.split(' ').slice(0, 2).join(' '));
+  const b = short(B);
+  if (/timeout/i.test(type)) return `Timeout${i.team ? ` ${i.team}` : ''}`;
+  if (/end (period|game)/i.test(type)) return type;
+  if (/jump ball/i.test(type)) return 'Jump ball';
+  if (/review/i.test(type)) return `Replay review${/stands/i.test(t) ? ' (call stands)' : /overturn/i.test(t) ? ' (overturned)' : ''}`;
+  if (/shot clock/i.test(type)) return `${i.team || 'Team'} shot clock violation`;
+  if (/delay|violation/i.test(type) && !A) return `${i.team || 'Team'} ${type.toLowerCase()}`;
+  if (/substitution/i.test(type)) return b ? `${b} in for ${a}` : `Sub: ${a}`;
+  if (/free throw/i.test(type)) {
+    const which = (type.match(/(\d of \d)/) || [])[1];
+    return `${a} ${/misses/i.test(t) ? 'misses' : 'makes'} FT${which ? ` ${which}` : ''}`;
+  }
+  if (/block/i.test(t)) { const blk = t.match(/^(.+?) blocks/); return `${blk && B && t.startsWith(B.name) ? b : a} blocks ${blk && B && t.startsWith(B.name) ? a : b || 'shot'}`.trim(); }
+  if (/steal/i.test(t) || /turnover/i.test(type)) {
+    const kind = type.replace(/turnover/i, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const stolen = t.match(/\(([^)]+) steals\)/i);
+    return `${a} turnover${kind ? ` (${kind})` : ''}${stolen ? `, stolen by ${short({ name: stolen[1] })}` : ''}`;
+  }
+  if (/rebound/i.test(type)) return !A ? `${i.team || 'Team'} team rebound` : `${a} ${/offensive/i.test(type) ? 'off.' : 'def.'} rebound`;
+  if (/foul/i.test(type)) return `${a} ${type.toLowerCase()}`;
+  if (/shot|layup|dunk|jumper|hook|tip/i.test(type + t)) {
+    const d0 = Number((t.match(/(\d+)-foot/) || [])[1] || 0);
+    const dist = d0 >= 5 ? d0 : null;
+    const three = /three point/i.test(t);
+    const shot = three ? 'three' : /dunk/i.test(type + t) ? 'dunk' : /layup/i.test(type + t) ? 'layup' : /hook/i.test(type + t) ? 'hook shot' : /tip/i.test(type + t) ? 'tip-in' : 'jumper';
+    const made = /makes/i.test(t) || i.scored;
+    const ast = t.match(/\(([^)]+?) assists\)/i);
+    return `${a} ${made ? 'makes' : 'misses'} ${dist ? `${dist}-ft ` : ''}${shot}${made && ast ? ` (${short({ name: ast[1] })} ast)` : ''}`;
+  }
+  return `${a} ${type.toLowerCase()}`.trim();
+}
+
+/** One-line description of a feed item. */
+export function summarize(item, sport) {
+  try {
+    return sport === 'nfl' ? nflSummary(item) : nbaSummary(item);
+  } catch {
+    return item.text;
+  }
+}

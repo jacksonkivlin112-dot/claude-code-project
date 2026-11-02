@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { statLine } from '../liveFeed.js';
+import { statLine, summarize } from '../liveFeed.js';
 import { Segmented, TeamLogo } from './ui.jsx';
 
 const Q = (p) => (p <= 4 ? `Q${p}` : p === 5 ? 'OT' : `${p - 4}OT`);
@@ -28,6 +28,7 @@ export default function LiveFeed({ feed, game, color, sport }) {
   const seen = useRef(new Set());
   const topRef = useRef();
   const [scrolledAway, setScrolledAway] = useState(false);
+  const [openId, setOpenId] = useState(null);
 
   // Detect plays that arrived since the last refresh.
   useEffect(() => {
@@ -91,7 +92,6 @@ export default function LiveFeed({ feed, game, color, sport }) {
             const tc = teamColor(i.team);
             const lead = i.actors[0];
             const second = i.actors[1];
-            const isPass = sport === 'nfl' && /pass/i.test(i.text) && second;
             const swing = i.wpDelta != null && Math.abs(i.wpDelta) >= 0.01 ? i.wpDelta : null;
             const swingTeam = swing != null ? (swing > 0 ? game.home.abbr : game.away.abbr) : null;
             return [header, (
@@ -103,18 +103,14 @@ export default function LiveFeed({ feed, game, color, sport }) {
                     {second && <Headshot a={second} size={i.big ? 34 : 28} ring={tc} />}
                   </div>
                   <div className="lf-body">
-                    <div className="lf-who">
-                      {lead ? (
-                        <strong>{lead.name}{second && <span className="lf-arrow">{isPass ? ' → ' : ' · '}</span>}{second && second.name}</strong>
-                      ) : <strong>{i.type || 'Play'}</strong>}
-                      <span className="lf-time"><TeamLogo abbr={i.team} size={13} /> {Q(i.period)} {i.clock}</span>
-                    </div>
-                    {i.dd && <div className="lf-dd">{i.dd}</div>}
-                    <p className="lf-text">{sport === 'nba' && lead && i.text.startsWith(lead.name) ? i.text.slice(lead.name.length).trim().replace(/^./, (c) => c.toUpperCase()) : i.text}</p>
+                    <button type="button" className="lf-main" onClick={() => setOpenId(openId === i.id ? null : i.id)} aria-expanded={openId === i.id} title="Tap for the full play description">
+                      <strong className="lf-sum">{summarize(i, sport)}</strong>
+                      <span className="lf-time"><TeamLogo abbr={i.team} size={13} /> {Q(i.period)} {i.clock}{i.dd ? ` · ${i.dd}` : ''}</span>
+                    </button>
+                    {openId === i.id && <p className="lf-text">{i.text}</p>}
                     {(i.big || i.scored) && lead && statLine(lead, sport) && <div className="lf-line">{lead.name.split(' ').slice(-1)[0]}: {statLine(lead, sport)}</div>}
                     <div className="lf-chips">
                       {i.tags.slice(i.big ? 1 : 0).map((t) => <span key={t.label} className={`tag tone-${t.tone}`}>{t.label}</span>)}
-                      {i.yards != null && i.yards !== 0 && /rush|pass|reception|sack|scramble/i.test(i.type) && <span className={`yds ${i.yards > 0 ? 'pos' : 'neg'}`}>{i.yards > 0 ? '+' : ''}{i.yards} yds</span>}
                       {swing != null && <span className={`lf-swing ${Math.abs(swing) >= 0.08 ? 'hot' : ''}`} title="Change in win probability on this play">{swing > 0 ? '▲' : '▼'} {Math.abs(Math.round(swing * 100))}% {swingTeam}</span>}
                     </div>
                   </div>

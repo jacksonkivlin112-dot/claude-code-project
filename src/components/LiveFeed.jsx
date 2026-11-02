@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { keyStat, statLine, summarize } from '../liveFeed.js';
+import { summarize } from '../liveFeed.js';
 import { Segmented, TeamLogo } from './ui.jsx';
 
 export const Q = (p) => (p <= 4 ? `Q${p}` : p === 5 ? 'OT' : `${p - 4}OT`);
@@ -22,7 +22,6 @@ export function PlayCard({ item: i, game, color, sport, fresh, open, onToggle, g
   const second = i.actors[1];
   const swing = i.wpDelta != null && Math.abs(i.wpDelta) >= 0.03 ? i.wpDelta : null;
   const swingTeam = swing != null ? (swing > 0 ? game.home.abbr : game.away.abbr) : null;
-  const ks = keyStat(i, sport);
   const extraTags = i.tags.slice(i.big ? 1 : 0).filter((t) => t.label !== 'MOMENTUM' || !i.big);
   return (
     <article className={`lf-card ${i.big ? 'big' : ''} ${i.scored ? 'scored' : ''} ${fresh ? 'new' : ''}`} style={{ '--tc': tc }}>
@@ -36,7 +35,11 @@ export function PlayCard({ item: i, game, color, sport, fresh, open, onToggle, g
           {gameTag}
           <strong className="lf-sum">{summarize(i, sport)}</strong>
           <span className="lf-time"><TeamLogo abbr={i.team} size={14} /> {Q(i.period)} {i.clock}{i.dd ? ` · ${i.dd}` : ''}</span>
-          {(i.big || i.scored) && lead && statLine(lead, sport) && <span className="lf-line">{lead.name.split(' ').slice(-1)[0]}: {statLine(lead, sport)}</span>}
+          {i.after?.length > 0 && (
+            <span className="lf-after">
+              {i.after.map((x) => <span key={x.name}><b>{x.name}:</b> {x.line}</span>)}
+            </span>
+          )}
           {(extraTags.length > 0 || swing != null) && (
             <span className="lf-chips">
               {extraTags.map((t) => <span key={t.label} className={`tag tone-${t.tone}`}>{t.label}</span>)}
@@ -49,8 +52,6 @@ export function PlayCard({ item: i, game, color, sport, fresh, open, onToggle, g
             <span>{game.away.abbr} <b>{i.awayScore}</b></span>
             <span>{game.home.abbr} <b>{i.homeScore}</b></span>
           </span>
-        ) : ks ? (
-          <span className={`lf-key ${String(ks.value).startsWith('-') ? 'neg' : ''}`}><b>{ks.value}</b>{ks.label && <small>{ks.label}</small>}</span>
         ) : null}
       </button>
       {open && <p className="lf-text">{i.text}</p>}

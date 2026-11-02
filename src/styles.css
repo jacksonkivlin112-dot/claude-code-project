@@ -1800,3 +1800,7 @@ a.tick:hover { box-shadow: var(--glow); }
 .hf-head h2 { font-family: var(--font-body); font-style: normal; text-transform: none; font-size: 26px; font-weight: 800; color: var(--text-2); letter-spacing: -0.02em; }
 @media (max-width: 860px) { .hf-head h2 { font-size: 24px; } }
 .menu-top .brand { display: flex !important; }
+.lf-after { display: flex; flex-direction: column; gap: 1px; font-size: 14px; font-weight: 700; color: var(--great); font-variant-numeric: tabular-nums; }
+.lf-after b { font-weight: 900; }
+.lf-after span + span { font-size: 13px; opacity: 0.85; }
+@media (max-width: 860px) { .lf-after { font-size: 13px; } .lf-after span + span { font-size: 12px; } }

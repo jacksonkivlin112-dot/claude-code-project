@@ -3,7 +3,7 @@ import { useData } from '../../data.jsx';
 import { MARKETS_NBA } from '../../oddsapi.js';
 import { PropsPage } from '../../pages/Props.jsx';
 import { DateNav, useNbaOutlook, useNbaRows } from '../components.jsx';
-import { buildNbaLookups, evaluateNbaProp, parseManualNba } from '../props.js';
+import { NBA_ALIASES, buildNbaLookups, evaluateNbaProp, parseManualNba } from '../props.js';
 
 const ALL = Object.keys(MARKETS_NBA);
 
@@ -37,9 +37,10 @@ export const NBA_CFG = {
   },
   marketsFor: () => ALL,
   HeaderExtra: DateNav,
+  aliases: NBA_ALIASES,
 };
 
-function useNbaContext() {
+export function useNbaContext() {
   const { season, dvp, b2b, liveById, gameByTeam, teams } = useData();
   const rows = useNbaRows();
   const outlook = useNbaOutlook();

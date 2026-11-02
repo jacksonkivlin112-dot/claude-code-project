@@ -7,6 +7,7 @@ import Home from './pages/Home.jsx';
 import Matchups from './pages/Matchups.jsx';
 import Projections from './pages/Projections.jsx';
 import Props from './pages/Props.jsx';
+import Scan from './pages/Scan.jsx';
 import Stats from './pages/Stats.jsx';
 import Teams from './pages/Teams.jsx';
 import { NbaPlayerPanel, NbaTeamPanel } from './nba/components.jsx';
@@ -16,20 +17,21 @@ import NbaHome from './nba/pages/Home.jsx';
 import NbaMatchups from './nba/pages/Matchups.jsx';
 import NbaProjections from './nba/pages/Projections.jsx';
 import NbaProps from './nba/pages/Props.jsx';
+import NbaScan from './nba/pages/Scan.jsx';
 import NbaStats from './nba/pages/Stats.jsx';
 import NbaTeams from './nba/pages/Teams.jsx';
 
 const SPORTS = {
   nfl: {
     Provider: DataProvider,
-    pages: { home: Home, game: Game, projections: Projections, props: Props, stats: Stats, teams: Teams, matchups: Matchups },
+    pages: { home: Home, game: Game, projections: Projections, props: Props, scan: Scan, stats: Stats, teams: Teams, matchups: Matchups },
     panels: {},
     credit: 'Stats & projections via Sleeper · Scores, standings & logos via ESPN',
     footer: (core) => (core ? `${core.season} season · data refreshes automatically each week` : ''),
   },
   nba: {
     Provider: NbaDataProvider,
-    pages: { home: NbaHome, game: NbaGame, projections: NbaProjections, props: NbaProps, stats: NbaStats, teams: NbaTeams, matchups: NbaMatchups },
+    pages: { home: NbaHome, game: NbaGame, projections: NbaProjections, props: NbaProps, scan: NbaScan, stats: NbaStats, teams: NbaTeams, matchups: NbaMatchups },
     panels: { PlayerPanelC: NbaPlayerPanel, TeamPanelC: NbaTeamPanel },
     credit: 'Box scores & projections via Sleeper · Scores, standings & logos via ESPN',
     footer: (core) => (core ? `${core.label} season · data refreshes automatically every night` : ''),

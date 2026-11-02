@@ -43,12 +43,13 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           PROPS_MARKETS: ${{ vars.PROPS_MARKETS }}
           PROPS_WITHIN_HOURS: ${{ vars.PROPS_WITHIN_HOURS }}
+          PROPS_SHARE: ${{ vars.NFL_PROPS_SHARE || '0.5' }}
         run: npm run props
       - name: Refresh NBA PrizePicks lines (needs ODDS_API_KEY secret)
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           NBA_PROPS_MARKETS: ${{ vars.NBA_PROPS_MARKETS }}
-          PROPS_MIN_INTERVAL_MIN: ${{ vars.PROPS_MIN_INTERVAL_MIN || '60' }}
+          PROPS_SHARE: ${{ vars.NBA_PROPS_SHARE || '0.5' }}
         run: npm run props:nba
       - name: Commit snapshot if changed
         run: |

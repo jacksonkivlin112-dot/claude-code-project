@@ -75,6 +75,14 @@ function nflActors(text, idx) {
   return found;
 }
 
+/** Yards gained on the play itself, ignoring penalty yardage folded into ESPN's statYardage. */
+export function gainFromText(text = '') {
+  const main = text.split(/PENALTY/i)[0];
+  if (/for no gain/i.test(main)) return 0;
+  const m = main.match(/for (-?\d+) yards?/i);
+  return m ? Number(m[1]) : null;
+}
+
 const wpIndex = (raw) => {
   const m = new Map();
   (raw?.winprobability || []).forEach((w) => m.set(String(w.playId), w.homeWinPercentage));
@@ -94,6 +102,7 @@ export function buildFeed(game, raw, sport) {
     ? game.drives.flatMap((d) => d.plays.map((p) => ({ ...p, driveTeam: d.team, driveId: d.id, driveResult: d.result })))
     : game.plays;
   const rawNba = sport === 'nba' ? new Map((raw?.plays || []).map((p) => [String(p.id), p])) : null;
+  const running = new Map(); // athlete id -> running game totals
   let prevWp = 0.5;
   let prevScore = [0, 0];
 
@@ -136,6 +145,7 @@ export function buildFeed(game, raw, sport) {
     }
     if (delta != null && Math.abs(delta) >= (sport === 'nfl' ? 0.1 : 0.08)) { tags.push({ label: 'MOMENTUM', tone: 'hot' }); big = true; }
     const quiet = sport === 'nba' && /substitution|timeout|end period|jump ball/i.test(p.type) && !p.scoring;
+    const after = sport === 'nfl' ? nflAccumulate(running, p, actors) : nbaAccumulate(running, p, actors);
 
     items.push({
       id: p.id,
@@ -155,11 +165,24 @@ export function buildFeed(game, raw, sport) {
       homeWp,
       wpDelta: delta,
       dd: sport === 'nfl' && p.start?.down > 0 ? p.start.downDistanceText : null,
-      yards: sport === 'nfl' ? p.yards : null,
+      yards: sport === 'nfl' ? (gainFromText(p.text) ?? p.yards) : null,
       driveId: p.driveId,
       driveResult: p.driveResult,
       wallclock: p.wallclock || null,
+      after,
     });
+  }
+  // Each player's latest card shows the official box-score line, so "right now" is exact
+  // (play-text replay can drift a few yards on spot-foul penalties).
+  const done = new Set();
+  for (let k = items.length - 1; k >= 0; k--) {
+    for (const x of items[k].after || []) {
+      const key = `${x.id}|${x.role}`;
+      if (done.has(key)) continue;
+      done.add(key);
+      const official = boxLine(athletes.get(String(x.id)), x.role);
+      if (official) x.line = official;
+    }
   }
   return { items: items.reverse(), athletes };
 }
@@ -281,5 +304,122 @@ export function keyStat(i, sport) {
   if (/block/i.test(i.text)) return { value: 'BLK', label: '' };
   if (/steal/i.test(i.text)) return { value: 'STL', label: '' };
   if (/rebound/i.test(i.type) && i.actors.length) return { value: 'REB', label: '' };
+  return null;
+}
+
+// ---- Running stats -------------------------------------------------------------
+// Box scores only give totals, so replay the game play by play to know each
+// player's line right after any given play.
+
+const normAbbr = (x) => ({ WSH: 'WAS', JAC: 'JAX', LA: 'LAR' })[x?.toUpperCase()] || x?.toUpperCase();
+const tot = (map, a) => {
+  if (!map.has(a.id)) map.set(a.id, {});
+  return map.get(a.id);
+};
+const nameOf = (a) => {
+  const parts = (a.name || '').replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/i, '').split(' ');
+  return parts.length > 1 ? `${parts[0][0]}. ${parts.slice(1).join(' ')}` : a.name;
+};
+
+function nflLine(t, role) {
+  if (role === 'pass') return `${t.cmp || 0}/${t.att || 0}, ${t.passYds || 0} yds${t.passTd ? `, ${t.passTd} TD` : ''}${t.int ? `, ${t.int} INT` : ''}`;
+  if (role === 'rec') return `${t.rec || 0} rec, ${t.recYds || 0} yds${t.recTd ? `, ${t.recTd} TD` : ''}`;
+  if (role === 'rush') return `${t.car || 0} car, ${t.rushYds || 0} yds${t.rushTd ? `, ${t.rushTd} TD` : ''}`;
+  if (role === 'fg') return `${t.fgm || 0}/${t.fga || 0} FG`;
+  return '';
+}
+
+/** Update NFL running totals for one play; returns the lines to show after it. */
+function nflAccumulate(map, p, actors) {
+  const t = p.text || '';
+  const type = p.type || '';
+  if (/no play/i.test(t) || /^penalty$/i.test(type) || /two-point|extra point/i.test(type)) return [];
+  const [A, B] = actors;
+  let y = gainFromText(t) ?? p.yards ?? 0;
+  // Offensive spot fouls (e.g. holding downfield): the player is credited only up to the spot.
+  const spot = t.match(/PENALTY on ([A-Z]{2,3})-[^,]+,[^,]+,\s*\d+\s*yards?,\s*enforced at ([A-Z]{2,3})?\s?(\d+)/i);
+  const off = p.start?.team;
+  if (spot && off && p.start?.yardsToEndzone != null && normAbbr(spot[1]) === off) {
+    const spotYte = spot[2] ? (normAbbr(spot[2]) === off ? 100 - Number(spot[3]) : Number(spot[3])) : 50;
+    y = Math.min(y, p.start.yardsToEndzone - spotYte);
+  }
+  const td = /touchdown/i.test(type);
+  if (/field goal/i.test(type) && A) {
+    const k = tot(map, A);
+    k.fga = (k.fga || 0) + 1;
+    if (/good/i.test(type)) k.fgm = (k.fgm || 0) + 1;
+    return [{ id: A.id, role: 'fg', name: nameOf(A), line: nflLine(k, 'fg') }];
+  }
+  const isPass = /pass/i.test(type) || / pass (short|deep|incomplete)/i.test(t) || /INTERCEPTED/.test(t);
+  if (isPass && A && !/sack/i.test(type)) {
+    const q = tot(map, A);
+    q.att = (q.att || 0) + 1;
+    const complete = /reception|passing touchdown/i.test(type) && !/incomplete/i.test(t);
+    if (/INTERCEPTED/.test(t) || /interception/i.test(type)) q.int = (q.int || 0) + 1;
+    const out = [];
+    if (complete && B) {
+      q.cmp = (q.cmp || 0) + 1;
+      q.passYds = (q.passYds || 0) + y;
+      const r = tot(map, B);
+      r.rec = (r.rec || 0) + 1;
+      r.recYds = (r.recYds || 0) + y;
+      if (td) { q.passTd = (q.passTd || 0) + 1; r.recTd = (r.recTd || 0) + 1; }
+      out.push({ id: B.id, role: 'rec', name: nameOf(B), line: nflLine(r, 'rec') });
+    }
+    out.push({ id: A.id, role: 'pass', name: nameOf(A), line: nflLine(q, 'pass') });
+    return out;
+  }
+  if (/rush|scramble/i.test(type) && A) {
+    const r = tot(map, A);
+    r.car = (r.car || 0) + 1;
+    r.rushYds = (r.rushYds || 0) + y;
+    if (td) r.rushTd = (r.rushTd || 0) + 1;
+    return [{ id: A.id, role: 'rush', name: nameOf(A), line: nflLine(r, 'rush') }];
+  }
+  return [];
+}
+
+function nbaLine(t) {
+  return [`${t.pts || 0} pts`, t.reb ? `${t.reb} reb` : null, t.ast ? `${t.ast} ast` : null, t.tpm ? `${t.tpm} 3pm` : null, t.stl ? `${t.stl} stl` : null, t.blk ? `${t.blk} blk` : null].filter(Boolean).join(', ');
+}
+
+/** Update NBA running totals for one play; returns the lines to show after it. */
+function nbaAccumulate(map, p, actors) {
+  const t = p.text || '';
+  const type = p.type || '';
+  const [A, B] = actors;
+  if (!A) return [];
+  const show = (...xs) => xs.filter(Boolean).map((a) => ({ id: a.id, role: 'nba', name: nameOf(a), line: nbaLine(tot(map, a)) }));
+  if (p.scoring && p.scoreValue) {
+    const s = tot(map, A);
+    s.pts = (s.pts || 0) + p.scoreValue;
+    if (p.scoreValue === 3) s.tpm = (s.tpm || 0) + 1;
+    if (B && /assists/i.test(t)) { const a = tot(map, B); a.ast = (a.ast || 0) + 1; return show(A, B); }
+    return show(A);
+  }
+  if (/rebound/i.test(type)) { const s = tot(map, A); s.reb = (s.reb || 0) + 1; return show(A); }
+  if (/blocks/i.test(t)) { const s = tot(map, A); s.blk = (s.blk || 0) + 1; return show(A); }
+  if (/steals/i.test(t) && B) { const s = tot(map, B); s.stl = (s.stl || 0) + 1; return show(B); }
+  if (/misses/i.test(t) || /turnover|foul/i.test(type)) return show(A);
+  return [];
+}
+
+/** Current official line from the box score in the same format as the replay lines. */
+function boxLine(a, role) {
+  const g = a?.groups;
+  if (!g) return null;
+  const n = (v) => Number(String(v ?? 0).split('-')[0]) || 0;
+  if (role === 'pass' && g.passing) {
+    const [c, att] = String(g.passing['C/ATT'] || '0/0').split('/');
+    return nflLine({ cmp: n(c), att: n(att), passYds: n(g.passing.YDS), passTd: n(g.passing.TD), int: n(g.passing.INT) }, 'pass');
+  }
+  if (role === 'rec' && g.receiving) return nflLine({ rec: n(g.receiving.REC), recYds: n(g.receiving.YDS), recTd: n(g.receiving.TD) }, 'rec');
+  if (role === 'rush' && g.rushing) return nflLine({ car: n(g.rushing.CAR), rushYds: n(g.rushing.YDS), rushTd: n(g.rushing.TD) }, 'rush');
+  if (role === 'fg' && g.kicking) { const [m, att] = String(g.kicking.FG || '0/0').split('/'); return nflLine({ fgm: n(m), fga: n(att) }, 'fg'); }
+  if (role === 'nba') {
+    const s = g.stats || Object.values(g)[0];
+    if (!s) return null;
+    return nbaLine({ pts: n(s.PTS), reb: n(s.REB), ast: n(s.AST), tpm: n(s['3PT']), stl: n(s.STL), blk: n(s.BLK) });
+  }
   return null;
 }

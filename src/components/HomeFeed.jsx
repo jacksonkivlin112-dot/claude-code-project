@@ -24,7 +24,7 @@ const SOURCES = {
  * Home feed: swipeable game cards, then the biggest plays from every live game
  * (or today's finished games when nothing is live), newest first.
  */
-export default function HomeFeed({ sport }) {
+export default function HomeFeed({ sport, rail = true }) {
   const { board, teams } = useData();
   const src = SOURCES[sport];
   const [plays, setPlays] = useState(null); // null = loading, [] = none
@@ -81,7 +81,7 @@ export default function HomeFeed({ sport }) {
 
   return (
     <section className="hf">
-      <div className="hf-rail" role="list" aria-label="Games">
+      {rail && <div className="hf-rail" role="list" aria-label="Games">
         {games.map((g) => {
           const pHome = g.liveHomeWp;
           return (
@@ -108,7 +108,7 @@ export default function HomeFeed({ sport }) {
             </a>
           );
         })}
-      </div>
+      </div>}
 
       <div className="hf-head">
         <h2>{live.length ? 'Biggest plays right now' : 'Biggest plays today'}</h2>

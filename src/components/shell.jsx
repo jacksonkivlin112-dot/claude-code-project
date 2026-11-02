@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Logo from './Logo.jsx';
 import { useData } from '../data.jsx';
 import { FORMATS } from '../model.js';
@@ -76,10 +77,15 @@ export function Header({ route }) {
       : `${core.season} · Week ${core.week}`
     : null;
   const [theme, setTheme] = useTheme();
+  const [menu, setMenu] = useState(false);
   useNow(30000);
+  useEffect(() => setMenu(false), [route.path, route.sport]);
   return (
     <header className="topbar">
       <div className="topbar-inner">
+        <button type="button" className="menu-btn" onClick={() => setMenu(true)} aria-label="Open menu">
+          <Icon d="M4 7h16M4 12h16M4 17h16" size={22} />
+        </button>
         <a className="brand" href={href(route.sport, 'home')} aria-label="Gridiron Edge home">
           <Logo size={34} />
           <span className="brand-text">
@@ -102,7 +108,8 @@ export function Header({ route }) {
           ))}
         </nav>
         <div className="topbar-tools">
-          {setFmt && <Segmented size="sm" label="Scoring format" value={fmt} onChange={setFmt} options={Object.entries(FORMATS).map(([value, v]) => ({ value, label: v.label }))} />}
+          {setFmt && <span className="fmt-desktop"><Segmented size="sm" label="Scoring format" value={fmt} onChange={setFmt} options={Object.entries(FORMATS).map(([value, v]) => ({ value, label: v.label }))} /></span>}
+          <span className="tool-pill">
           <button type="button" className="icon-btn" onClick={reload} title={updatedAt ? `Updated ${timeAgo(updatedAt)} · click to refresh` : 'Refresh'} aria-label="Refresh data">
             <svg className={loading ? 'spin' : ''} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
               <path d="M21 12a9 9 0 1 1-2.64-6.36M21 4v5h-5" />
@@ -115,22 +122,79 @@ export function Header({ route }) {
               <Icon size={16} d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z" />
             )}
           </button>
+          </span>
         </div>
       </div>
+      <LeagueTabs route={route} anyLive={anyLive} />
+      {menu && createPortal(
+        <div className="menu-sheet" onClick={() => setMenu(false)}>
+          <div className="menu-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="menu-top">
+              <a className="brand" href={href(route.sport, 'home')}><Logo size={30} /><span className="brand-text">Gridiron<span>Edge</span></span></a>
+              <button type="button" className="icon-btn" onClick={() => setMenu(false)} aria-label="Close menu">✕</button>
+            </div>
+            {pill && <span className="week-pill menu-pill">{anyLive && <span className="live-dot" />}{pill}</span>}
+            <nav className="menu-links">
+              {nav.map((n) => (
+                <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''}>
+                  <Icon d={n.icon} size={20} /> {n.label}
+                </a>
+              ))}
+            </nav>
+            {setFmt && (
+              <div className="menu-row">
+                <span>Fantasy scoring</span>
+                <Segmented size="sm" label="Scoring format" value={fmt} onChange={setFmt} options={Object.entries(FORMATS).map(([value, v]) => ({ value, label: v.label }))} />
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
     </header>
   );
 }
 
-export function MobileNav({ route }) {
+/** Big league tabs under the header on phones. */
+function LeagueTabs({ route, anyLive }) {
   return (
-    <nav className="mobile-nav" aria-label="Primary mobile">
-      {navFor(route.sport).map((n) => (
-        <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''}>
-          <Icon d={n.icon} size={20} />
-          <span>{n.label.split(' ')[0]}</span>
-        </a>
-      ))}
+    <nav className="league-tabs" aria-label="League">
+      {['nfl', 'nba'].map((s) => {
+        const target = navFor(s).some((n) => n.path === route.path) ? route.path : 'home';
+        return (
+          <a key={s} href={href(s, target)} className={route.sport === s ? 'on' : ''}>
+            {s.toUpperCase()}
+            {route.sport === s && anyLive && <span className="lt-dot" aria-label="Live games" />}
+          </a>
+        );
+      })}
     </nav>
+  );
+}
+
+const DOCK = ['home', 'props', 'parlays', 'scan', 'projections'];
+
+/** Floating rounded bottom bar with the main sections, plus a separate search button. */
+export function MobileNav({ route }) {
+  const items = navFor(route.sport).filter((n) => DOCK.includes(n.path)).sort((a, b) => DOCK.indexOf(a.path) - DOCK.indexOf(b.path));
+  return (
+    <div className="dock">
+      <nav className="mobile-nav" aria-label="Primary mobile">
+        {items.map((n) => (
+          <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''} aria-label={n.label} title={n.label}>
+            <Icon d={n.icon} size={22} />
+          </a>
+        ))}
+      </nav>
+      <a
+        className="dock-search"
+        href={href(route.sport, 'props')}
+        aria-label="Search players"
+        onClick={() => { try { sessionStorage.setItem('ge:focusSearch', '1'); } catch { /* ignore */ } }}
+      >
+        <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4" size={24} />
+      </a>
+    </div>
   );
 }
 

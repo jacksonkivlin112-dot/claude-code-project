@@ -1,4 +1,5 @@
 import HomeFeed from '../components/HomeFeed.jsx';
+import { DateStrip, GamesSection, InjuriesSection, PerformerPill, StreaksSection, useNflDays } from '../components/HomeSections.jsx';
 import { useState } from 'react';
 import { useData } from '../data.jsx';
 import { GameStatus } from '../components/shell.jsx';
@@ -12,6 +13,16 @@ export default function Home() {
   const rows = useProjectionRows(core?.week);
   const outlook = useTeamOutlook();
   const [pos, setPos] = useState('ALL');
+  const { days, defaultDay } = useNflDays();
+  const [day, setDay] = useState(null);
+  const selDay = day || defaultDay;
+  const dayGames = days.find((d) => d.ymd === selDay)?.games || [];
+  const spreadOf = (g) => {
+    const h = outlook?.teams.find((t) => t.abbr === g.home.abbr);
+    if (!h) return null;
+    const m = Math.round(Math.abs(h.margin) * 2) / 2;
+    return m < 0.5 ? 'Pick’em (proj)' : `${h.margin > 0 ? g.home.abbr : g.away.abbr} by ${m} (proj)`;
+  };
 
   if (!core || !rows) return <HomeSkeleton />;
 
@@ -37,7 +48,12 @@ export default function Home() {
 
   return (
     <div className="page">
-      <HomeFeed sport="nfl" />
+      <DateStrip days={days} value={selDay} onChange={setDay} />
+      <GamesSection games={dayGames} sport="nfl" spreadOf={spreadOf} onStandings={() => { window.location.hash = '/teams'; }} />
+      <InjuriesSection sport="nfl" />
+      <StreaksSection sport="nfl" />
+      <HomeFeed sport="nfl" rail={false} />
+      <PerformerPill sport="nfl" />
       <section className="hero">
         <div>
           <p className="eyebrow">{core.season} regular season</p>

@@ -76,7 +76,7 @@ export function TeamChip({ abbr, size = 20, showName = false }) {
   );
 }
 
-export function Avatar({ player, size = 36 }) {
+export function Avatar({ player, size = 36, badge = false }) {
   const { teams } = useData();
   const [err, setErr] = useState(false);
   const color = teams?.[player.team]?.color || 'var(--surface-3)';
@@ -87,6 +87,11 @@ export function Avatar({ player, size = 36 }) {
         <span className="avatar-initials" style={{ fontSize: size * 0.36 }}>{initials}</span>
       ) : (
         <img src={headshot(player)} alt="" loading="lazy" onError={() => setErr(true)} />
+      )}
+      {badge && player.team && (
+        <span className="avatar-badge" style={{ background: color }}>
+          <TeamLogo abbr={player.team} size={Math.round(size * 0.34)} />
+        </span>
       )}
     </span>
   );

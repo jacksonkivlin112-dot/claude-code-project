@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DataProvider } from '../data.jsx';
-import { NbaDataProvider } from '../nba/data.jsx';
-import { NBA_CFG, useNbaContext } from '../nba/pages/Props.jsx';
+import { CFGS, SPORT_LABEL, useDualSports } from '../dualSport.jsx';
+import { useNbaContext } from '../nba/pages/Props.jsx';
 import { normName } from '../oddsapi.js';
 import { BREAKEVEN } from '../propsModel.js';
 import { parseSlipText } from '../slipParse.js';
@@ -60,16 +59,6 @@ async function runOcr(file, onProgress) {
 
 // ---- Page ------------------------------------------------------------------------
 
-const CFGS = { nfl: NFL_CFG, nba: NBA_CFG };
-const SPORT_LABEL = { nfl: 'NFL', nba: 'NBA' };
-
-/** Runs one sport's data hook inside its own provider and reports the result up. */
-function Bridge({ use, onChange }) {
-  const v = use();
-  useEffect(() => { onChange(v); }, [v.ctx, v.rows]); // eslint-disable-line react-hooks/exhaustive-deps
-  return null;
-}
-
 // Reached from the NFL tab: NFL data comes from the page's provider, NBA is loaded alongside.
 export default function Scan() {
   const own = useNflContext();
@@ -82,8 +71,7 @@ export function NbaScanRoute() {
 }
 
 function ScanPage({ home, own }) {
-  const [other, setOther] = useState({ ctx: null, rows: null });
-  const sports = home === 'nfl' ? { nfl: own, nba: other } : { nfl: other, nba: own };
+  const [sports, bridge] = useDualSports(home, own);
   const roster = useMemo(
     () => [
       ...(sports.nfl.rows || []).filter((r) => r.pos !== 'K' && r.pos !== 'DEF').map((r) => ({ ...r, sport: 'nfl' })),
@@ -108,6 +96,18 @@ function ScanPage({ home, own }) {
   const [power, setPower] = useState(PAYOUTS.power);
   const [flex, setFlex] = useState(PAYOUTS.flex);
   const inputRef = useRef();
+
+  // Legs handed over from the Parlay Builder.
+  useEffect(() => {
+    try {
+      const pre = JSON.parse(localStorage.getItem('ge:scan:prefill') || 'null');
+      if (pre?.length) {
+        setLegs(pre);
+        setStatus({ phase: `Loaded ${pre.length} legs from the Parlay Builder`, done: true, ok: true });
+      }
+      localStorage.removeItem('ge:scan:prefill');
+    } catch { /* ignore */ }
+  }, []);
 
   const handleFile = useCallback(async (file) => {
     if (!file || !file.type.startsWith('image/')) return;
@@ -168,9 +168,7 @@ function ScanPage({ home, own }) {
         </div>
       </div>
 
-      {home === 'nfl'
-        ? <NbaDataProvider><Bridge use={useNbaContext} onChange={setOther} /></NbaDataProvider>
-        : <DataProvider><Bridge use={useNflContext} onChange={setOther} /></DataProvider>}
+      {bridge}
 
       <section
         className={`scan-drop ${status && !status.done ? 'busy' : ''}`}

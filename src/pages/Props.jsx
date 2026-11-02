@@ -774,6 +774,45 @@ function floorLine(M, mean, sd, target) {
   return Math.floor(mean - Z_UPPER[target] * sd - 0.5) + 0.5;
 }
 
+/**
+ * Highest-chance "More" picks: for each player and stat, the highest line that still
+ * clears `target` model chance, kept when the player has cleared it in most recent games
+ * and the line is realistic. One (best) stat per player, ranked by consistency.
+ */
+export function buildSafePicks(cfg, ctx, rows, target, gameByTeam = {}) {
+  if (!ctx || !rows) return [];
+  const out = [];
+  for (const r of rows) {
+    const safe = cfg.safeMarkets[cfg.groupOf(r)];
+    if (!safe || r.injury || r.proj < cfg.safeMinProj) continue;
+    for (const m of safe) {
+      const base = cfg.evaluate({ id: `h0:${r.id}|${m}`, player: r.name, market: m, line: 0.5 }, ctx);
+      if (!base || base.unmatched || !base.mean || base.games < 4) continue;
+      const line = floorLine(cfg.markets[m], base.mean, base.sd, target);
+      // Real PrizePicks lines sit near the projection; skip "safe" lines far below it.
+      if (line == null || line < (cfg.minLine[m] ?? 0.5) || line / base.mean < 0.6) continue;
+      const e = cfg.evaluate({ id: `h:${r.id}|${m}`, player: r.name, market: m, line }, ctx);
+      if (!e || e.pOver < target - 0.005 || !e.recent?.length) continue;
+      const hits = e.recent.filter((h) => h.over).length;
+      const hitRate = hits / e.recent.length;
+      if (hitRate < 0.6) continue;
+      const g = gameByTeam[r.team];
+      out.push({
+        key: `${cfg.sport}:${e.id}`, playerId: r.id, player: r.name, first: r.first, last: r.last, pos: r.pos, group: cfg.groupOf(r), team: r.team, opp: r.opp,
+        game: `${cfg.sport}:${g ? g.id : [r.team, r.opp].sort().join('-')}`, state: g?.state || 'pre', date: g?.date,
+        market: m, stat: cfg.markets[m].short, statLabel: cfg.markets[m].label, sport: cfg.sport, side: 'over', line, prob: e.pOver, mean: e.mean,
+        hits, n: e.recent.length, recent: e.recent, cushion: line / e.mean, actual: e.result?.actual, matchup: e.matchup, injury: e.injury,
+        // Rank: consistency first, then how realistic (close to the projection) the line is, then model chance.
+        score: 0.45 * hitRate + 0.35 * Math.min(1, line / e.mean) + 0.2 * e.pOver,
+      });
+    }
+  }
+  // Keep each player's single best stat so the list isn't one player repeated.
+  const bestByPlayer = new Map();
+  for (const p of out.sort((a, b) => b.score - a.score)) if (!bestByPlayer.has(p.playerId)) bestByPlayer.set(p.playerId, p);
+  return [...bestByPlayer.values()];
+}
+
 function HighChance({ ctx, rows, onSave }) {
   const cfg = useCfg();
   const { gameByTeam } = useData();
@@ -784,39 +823,7 @@ function HighChance({ ctx, rows, onSave }) {
   const [limit, setLimit] = useState(12);
   const [saved, setSaved] = useState({});
 
-  const picks = useMemo(() => {
-    if (!ctx || !rows) return [];
-    const out = [];
-    for (const r of rows) {
-      const safe = cfg.safeMarkets[cfg.groupOf(r)];
-      if (!safe || r.injury || r.proj < cfg.safeMinProj) continue;
-      for (const m of safe) {
-        const base = cfg.evaluate({ id: `h0:${r.id}|${m}`, player: r.name, market: m, line: 0.5 }, ctx);
-        if (!base || base.unmatched || !base.mean || base.games < 4) continue;
-        const line = floorLine(cfg.markets[m], base.mean, base.sd, target);
-        // Real PrizePicks lines sit near the projection; skip "safe" lines far below it.
-        if (line == null || line < (cfg.minLine[m] ?? 0.5) || line / base.mean < 0.6) continue;
-        const e = cfg.evaluate({ id: `h:${r.id}|${m}`, player: r.name, market: m, line }, ctx);
-        if (!e || e.pOver < target - 0.005 || !e.recent?.length) continue;
-        const hits = e.recent.filter((h) => h.over).length;
-        const hitRate = hits / e.recent.length;
-        if (hitRate < 0.6) continue;
-        const g = gameByTeam[r.team];
-        out.push({
-          key: e.id, playerId: r.id, player: r.name, first: r.first, last: r.last, pos: r.pos, group: cfg.groupOf(r), team: r.team, opp: r.opp,
-          game: g ? g.id : [r.team, r.opp].sort().join('-'), state: g?.state || 'pre', date: g?.date,
-          market: m, stat: cfg.markets[m].short, statLabel: cfg.markets[m].label, sport: cfg.sport, side: 'over', line, prob: e.pOver, mean: e.mean,
-          hits, n: e.recent.length, recent: e.recent, cushion: line / e.mean, actual: e.result?.actual,
-          // Rank: consistency first, then how realistic (close to the projection) the line is, then model chance.
-          score: 0.45 * hitRate + 0.35 * Math.min(1, line / e.mean) + 0.2 * e.pOver,
-        });
-      }
-    }
-    // Keep each player's single best stat so the list isn't one player repeated.
-    const bestByPlayer = new Map();
-    for (const p of out.sort((a, b) => b.score - a.score)) if (!bestByPlayer.has(p.playerId)) bestByPlayer.set(p.playerId, p);
-    return [...bestByPlayer.values()];
-  }, [ctx, rows, target, gameByTeam, cfg]);
+  const picks = useMemo(() => buildSafePicks(cfg, ctx, rows, target, gameByTeam), [ctx, rows, target, gameByTeam, cfg]);
 
   const shown = picks.filter((p) => (pos === 'ALL' || p.group === pos) && (!upcoming || p.state === 'pre'));
   const upcomingCount = picks.filter((p) => p.state === 'pre').length;

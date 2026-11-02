@@ -158,6 +158,7 @@ export function buildFeed(game, raw, sport) {
       yards: sport === 'nfl' ? p.yards : null,
       driveId: p.driveId,
       driveResult: p.driveResult,
+      wallclock: p.wallclock || null,
     });
   }
   return { items: items.reverse(), athletes };
@@ -264,4 +265,21 @@ export function summarize(item, sport) {
   } catch {
     return item.text;
   }
+}
+
+/** The one number a card leads with, e.g. { value: '+7', label: 'YDS' }. */
+export function keyStat(i, sport) {
+  if (sport === 'nfl') {
+    if (/field goal/i.test(i.type) && /good/i.test(i.type)) return { value: '+3', label: 'PTS' };
+    if (/touchdown/i.test(i.type)) return { value: '+6', label: 'TD' };
+    if (/sack/i.test(i.type)) return { value: i.yards ? `${i.yards}` : 'SACK', label: i.yards ? 'YDS' : '' };
+    if (i.tags.some((t) => /INTERCEPTION|TURNOVER/.test(t.label))) return { value: 'TO', label: 'TURNOVER' };
+    if (i.yards != null && /rush|pass|reception|scramble|return|kickoff/i.test(i.type) && i.yards !== 0) return { value: `${i.yards > 0 ? '+' : ''}${i.yards}`, label: 'YDS' };
+    return null;
+  }
+  if (i.scored && i.scoreValue) return { value: `+${i.scoreValue}`, label: 'PTS' };
+  if (/block/i.test(i.text)) return { value: 'BLK', label: '' };
+  if (/steal/i.test(i.text)) return { value: 'STL', label: '' };
+  if (/rebound/i.test(i.type) && i.actors.length) return { value: 'REB', label: '' };
+  return null;
 }

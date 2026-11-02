@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { statLine, summarize } from '../liveFeed.js';
+import { keyStat, statLine, summarize } from '../liveFeed.js';
 import { Segmented, TeamLogo } from './ui.jsx';
 
-const Q = (p) => (p <= 4 ? `Q${p}` : p === 5 ? 'OT' : `${p - 4}OT`);
+export const Q = (p) => (p <= 4 ? `Q${p}` : p === 5 ? 'OT' : `${p - 4}OT`);
 const PAGE = 40;
 
 function Headshot({ a, size = 40, ring }) {
@@ -15,10 +15,50 @@ function Headshot({ a, size = 40, ring }) {
   );
 }
 
-/**
- * Real-time play feed: one card per play (newest first), player headshots,
- * score changes, win-probability swing, highlighted big moments.
- */
+/** One play: big photo, one-line summary, the key stat large on the right. */
+export function PlayCard({ item: i, game, color, sport, fresh, open, onToggle, gameTag }) {
+  const tc = i.team === game.home.abbr ? color(game.home) : i.team === game.away.abbr ? color(game.away) : 'var(--accent)';
+  const lead = i.actors[0];
+  const second = i.actors[1];
+  const swing = i.wpDelta != null && Math.abs(i.wpDelta) >= 0.03 ? i.wpDelta : null;
+  const swingTeam = swing != null ? (swing > 0 ? game.home.abbr : game.away.abbr) : null;
+  const ks = keyStat(i, sport);
+  const extraTags = i.tags.slice(i.big ? 1 : 0).filter((t) => t.label !== 'MOMENTUM' || !i.big);
+  return (
+    <article className={`lf-card ${i.big ? 'big' : ''} ${i.scored ? 'scored' : ''} ${fresh ? 'new' : ''}`} style={{ '--tc': tc }}>
+      {i.big && i.tags[0] && <div className={`lf-banner tone-${i.tags[0].tone}`}>{i.tags[0].label}</div>}
+      <button type="button" className="lf-row" onClick={onToggle} aria-expanded={open}>
+        <span className="lf-faces">
+          {lead ? <Headshot a={lead} size={i.big ? 76 : 58} ring={tc} /> : <span className="lf-teamface"><TeamLogo abbr={i.team} size={i.big ? 52 : 40} /></span>}
+          {second && <Headshot a={second} size={i.big ? 40 : 32} ring={tc} />}
+        </span>
+        <span className="lf-body">
+          {gameTag}
+          <strong className="lf-sum">{summarize(i, sport)}</strong>
+          <span className="lf-time"><TeamLogo abbr={i.team} size={14} /> {Q(i.period)} {i.clock}{i.dd ? ` · ${i.dd}` : ''}</span>
+          {(i.big || i.scored) && lead && statLine(lead, sport) && <span className="lf-line">{lead.name.split(' ').slice(-1)[0]}: {statLine(lead, sport)}</span>}
+          {(extraTags.length > 0 || swing != null) && (
+            <span className="lf-chips">
+              {extraTags.map((t) => <span key={t.label} className={`tag tone-${t.tone}`}>{t.label}</span>)}
+              {swing != null && <span className={`lf-swing ${Math.abs(swing) >= 0.08 ? 'hot' : ''}`} title="Change in win probability on this play">{swing > 0 ? '▲' : '▼'} {Math.abs(Math.round(swing * 100))}% {swingTeam}</span>}
+            </span>
+          )}
+        </span>
+        {i.scored ? (
+          <span className="lf-key score">
+            <span>{game.away.abbr} <b>{i.awayScore}</b></span>
+            <span>{game.home.abbr} <b>{i.homeScore}</b></span>
+          </span>
+        ) : ks ? (
+          <span className={`lf-key ${String(ks.value).startsWith('-') ? 'neg' : ''}`}><b>{ks.value}</b>{ks.label && <small>{ks.label}</small>}</span>
+        ) : null}
+      </button>
+      {open && <p className="lf-text">{i.text}</p>}
+    </article>
+  );
+}
+
+/** Real-time play feed for one game: filters, new-play detection, paging. */
 export default function LiveFeed({ feed, game, color, sport }) {
   const [filter, setFilter] = useState('ALL');
   const [team, setTeam] = useState('ALL');
@@ -30,7 +70,6 @@ export default function LiveFeed({ feed, game, color, sport }) {
   const [scrolledAway, setScrolledAway] = useState(false);
   const [openId, setOpenId] = useState(null);
 
-  // Detect plays that arrived since the last refresh.
   useEffect(() => {
     const ids = feed.items.map((i) => i.id);
     if (seen.current.size) {
@@ -59,24 +98,13 @@ export default function LiveFeed({ feed, game, color, sport }) {
     return !i.quiet;
   }), [feed, filter, team]);
 
-  const teamColor = (abbr) => (abbr === game.home.abbr ? color(game.home) : abbr === game.away.abbr ? color(game.away) : 'var(--accent)');
-  const live = game.state === 'in';
   let lastPeriod = null;
-
   return (
     <div className="lf">
-      <div className="lf-sticky">
-        <span className="lf-score">
-          <TeamLogo abbr={game.away.abbr} size={20} /> <b>{game.away.score ?? 0}</b>
-          <span className="lf-clock">{live && <span className="live-dot" />}{game.shortDetail || ''}</span>
-          <b>{game.home.score ?? 0}</b> <TeamLogo abbr={game.home.abbr} size={20} />
-        </span>
-        <span className="lf-tools">
-          <Segmented size="sm" label="Feed filter" value={filter} onChange={(v) => { setFilter(v); setLimit(PAGE); }} options={[{ value: 'ALL', label: 'All' }, { value: 'BIG', label: 'Big plays' }, { value: 'SCORE', label: 'Scoring' }]} />
-          <Segmented size="sm" label="Team" value={team} onChange={(v) => { setTeam(v); setLimit(PAGE); }} options={[{ value: 'ALL', label: 'Both' }, { value: game.away.abbr, label: game.away.abbr }, { value: game.home.abbr, label: game.home.abbr }]} />
-        </span>
+      <div className="lf-filters" ref={topRef}>
+        <Segmented size="sm" label="Feed filter" value={filter} onChange={(v) => { setFilter(v); setLimit(PAGE); }} options={[{ value: 'ALL', label: 'All plays' }, { value: 'BIG', label: 'Big plays' }, { value: 'SCORE', label: 'Scoring' }]} />
+        <Segmented size="sm" label="Team" value={team} onChange={(v) => { setTeam(v); setLimit(PAGE); }} options={[{ value: 'ALL', label: 'Both' }, { value: game.away.abbr, label: game.away.abbr }, { value: game.home.abbr, label: game.home.abbr }]} />
       </div>
-      <div ref={topRef} />
       {pending > 0 && (
         <button type="button" className="lf-pill" onClick={() => { topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setPending(0); }}>
           ↑ {pending} new play{pending === 1 ? '' : 's'}
@@ -89,38 +117,9 @@ export default function LiveFeed({ feed, game, color, sport }) {
           {items.slice(0, limit).map((i) => {
             const header = i.period !== lastPeriod ? <li key={`q${i.period}`} className="lf-period">{Q(i.period)}</li> : null;
             lastPeriod = i.period;
-            const tc = teamColor(i.team);
-            const lead = i.actors[0];
-            const second = i.actors[1];
-            const swing = i.wpDelta != null && Math.abs(i.wpDelta) >= 0.01 ? i.wpDelta : null;
-            const swingTeam = swing != null ? (swing > 0 ? game.home.abbr : game.away.abbr) : null;
             return [header, (
-              <li key={i.id} className={`lf-card ${i.big ? 'big' : ''} ${i.scored ? 'scored' : ''} ${fresh.has(i.id) ? 'new' : ''}`} style={{ '--tc': tc }}>
-                {i.big && i.tags[0] && <div className={`lf-banner tone-${i.tags[0].tone}`}>{i.tags[0].label}</div>}
-                <div className="lf-row">
-                  <div className="lf-faces">
-                    {lead ? <Headshot a={lead} size={i.big ? 54 : 42} ring={tc} /> : <span className="lf-teamface"><TeamLogo abbr={i.team} size={i.big ? 40 : 30} /></span>}
-                    {second && <Headshot a={second} size={i.big ? 34 : 28} ring={tc} />}
-                  </div>
-                  <div className="lf-body">
-                    <button type="button" className="lf-main" onClick={() => setOpenId(openId === i.id ? null : i.id)} aria-expanded={openId === i.id} title="Tap for the full play description">
-                      <strong className="lf-sum">{summarize(i, sport)}</strong>
-                      <span className="lf-time"><TeamLogo abbr={i.team} size={13} /> {Q(i.period)} {i.clock}{i.dd ? ` · ${i.dd}` : ''}</span>
-                    </button>
-                    {openId === i.id && <p className="lf-text">{i.text}</p>}
-                    {(i.big || i.scored) && lead && statLine(lead, sport) && <div className="lf-line">{lead.name.split(' ').slice(-1)[0]}: {statLine(lead, sport)}</div>}
-                    <div className="lf-chips">
-                      {i.tags.slice(i.big ? 1 : 0).map((t) => <span key={t.label} className={`tag tone-${t.tone}`}>{t.label}</span>)}
-                      {swing != null && <span className={`lf-swing ${Math.abs(swing) >= 0.08 ? 'hot' : ''}`} title="Change in win probability on this play">{swing > 0 ? '▲' : '▼'} {Math.abs(Math.round(swing * 100))}% {swingTeam}</span>}
-                    </div>
-                  </div>
-                  {i.scored && (
-                    <div className="lf-scorebox">
-                      <span>{game.away.abbr} <b>{i.awayScore}</b></span>
-                      <span>{game.home.abbr} <b>{i.homeScore}</b></span>
-                    </div>
-                  )}
-                </div>
+              <li key={i.id}>
+                <PlayCard item={i} game={game} color={color} sport={sport} fresh={fresh.has(i.id)} open={openId === i.id} onToggle={() => setOpenId(openId === i.id ? null : i.id)} />
               </li>
             )];
           })}

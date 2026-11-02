@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useData, usePersistentState } from '../data.jsx';
 import { DEFAULT_MARKETS, MARKETS, fetchPrizePicksLines, listEvents, normName } from '../oddsapi.js';
-import { BREAKEVEN, buildLookups, evaluateProp, parseManual } from '../propsModel.js';
+import { BREAKEVEN, buildLookups, evaluateProp, parseManual, probabilities } from '../propsModel.js';
 import { useProjectionRows, useTeamOutlook } from '../components/players.jsx';
 import { Avatar, Card, Empty, InjuryDot, PosBadge, Segmented, SkeletonRows, TeamLogo, WeeklyBars, f1, kickoff, timeAgo, useNow, useUi } from '../components/ui.jsx';
 
@@ -101,7 +101,7 @@ export default function Props() {
 
   const [market, setMarket] = useState('ALL');
   const [side, setSide] = useState('ALL');
-  const [minGrade, setMinGrade] = useState('lean');
+  const [minGrade, setMinGrade] = useState('solid');
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('prob');
   const [showSettings, setShowSettings] = useState(false);
@@ -185,6 +185,14 @@ export default function Props() {
                 </section>
               )}
 
+              {best.length >= 2 && (
+                <SlipBuilder
+                  title="Safest slip from today’s lines"
+                  subtitle="Highest-probability picks from the loaded lines, one per game"
+                  picks={open.filter((e) => e.grade.key === 'strong' || e.grade.key === 'solid').map((e) => ({ key: e.id, playerId: e.playerId, player: e.player, pos: e.pos, team: e.team, opp: e.opp, game: e.team && e.opp ? [e.team, e.opp].sort().join('-') : e.id, side: e.side, line: e.line, stat: e.marketShort, prob: e.prob }))}
+                />
+              )}
+
               {graded.length > 0 && (
                 <div className="record-bar">
                   <span>Model record this week (graded picks):</span>
@@ -224,6 +232,8 @@ export default function Props() {
               )}
             </>
           )}
+
+          <HighChance ctx={ctx} rows={rows} onSave={saveCheck} />
 
           <PlayerBoard ctx={ctx} rows={rows} feed={evaluated} manual={P.manual} onSave={saveCheck} />
 
@@ -682,6 +692,184 @@ function PropSheet({ r, ctx, lines, onSave }) {
         );
       })}
       <p className="muted small sheet-note">Model = projected stat this week (range covers about 2 of 3 outcomes). Enter the PrizePicks number to see More or Less with its probability. Tap ☆ to keep it in your saved lines.</p>
+    </div>
+  );
+}
+
+// ---- Highest-chance props ------------------------------------------------------
+// For each player and stat, find the highest line that still clears a target
+// probability, then keep only lines the player has also cleared consistently.
+
+const SAFE_MARKETS = {
+  QB: ['player_pass_yds', 'player_pass_completions', 'player_pass_attempts', 'player_rush_yds'],
+  RB: ['player_rush_yds', 'player_rush_attempts', 'player_receptions', 'player_reception_yds', 'player_rush_reception_yds'],
+  WR: ['player_receptions', 'player_reception_yds'],
+  TE: ['player_receptions', 'player_reception_yds'],
+};
+// Lines below these are too trivial to be offered or worth playing.
+const MIN_LINE = {
+  player_pass_yds: 149.5, player_pass_completions: 11.5, player_pass_attempts: 19.5, player_rush_yds: 19.5,
+  player_rush_attempts: 7.5, player_receptions: 2.5, player_reception_yds: 19.5, player_rush_reception_yds: 29.5,
+};
+const Z_UPPER = { 0.7: 0.5244, 0.75: 0.6745, 0.8: 0.8416 };
+
+function floorLine(market, mean, sd, target) {
+  if (MARKETS[market].dist === 'poisson') {
+    for (let k = Math.ceil(mean + 4 * Math.sqrt(mean + 1)); k >= 1; k--) {
+      if (probabilities('poisson', mean, 0, k - 0.5).over >= target) return k - 0.5;
+    }
+    return null;
+  }
+  return Math.floor(mean - Z_UPPER[target] * sd - 0.5) + 0.5;
+}
+
+function HighChance({ ctx, rows, onSave }) {
+  const { gameByTeam } = useData();
+  const { openPlayer } = useUi();
+  const [target, setTarget] = useState(0.75);
+  const [pos, setPos] = useState('ALL');
+  const [upcoming, setUpcoming] = useState(true);
+  const [limit, setLimit] = useState(12);
+  const [saved, setSaved] = useState({});
+
+  const picks = useMemo(() => {
+    if (!ctx || !rows) return [];
+    const out = [];
+    for (const r of rows) {
+      if (!SAFE_MARKETS[r.pos] || r.injury || r.proj < 5) continue;
+      for (const m of SAFE_MARKETS[r.pos]) {
+        const base = evaluateProp({ id: `h0:${r.id}|${m}`, player: r.name, market: m, line: 0.5 }, ctx);
+        if (!base || base.unmatched || !base.mean || base.games < 4) continue;
+        const line = floorLine(m, base.mean, base.sd, target);
+        // Real PrizePicks lines sit near the projection; skip "safe" lines far below it.
+        if (line == null || line < MIN_LINE[m] || line / base.mean < 0.6) continue;
+        const e = evaluateProp({ id: `h:${r.id}|${m}`, player: r.name, market: m, line }, ctx);
+        if (!e || e.pOver < target - 0.005 || !e.recent?.length) continue;
+        const hits = e.recent.filter((h) => h.over).length;
+        const hitRate = hits / e.recent.length;
+        if (hitRate < 0.6) continue;
+        const g = gameByTeam[r.team];
+        out.push({
+          key: e.id, playerId: r.id, player: r.name, first: r.first, last: r.last, pos: r.pos, team: r.team, opp: r.opp,
+          game: g ? g.id : [r.team, r.opp].sort().join('-'), state: g?.state || 'pre', date: g?.date,
+          market: m, stat: MARKETS[m].short, statLabel: MARKETS[m].label, side: 'over', line, prob: e.pOver, mean: e.mean,
+          hits, n: e.recent.length, recent: e.recent, cushion: line / e.mean, actual: e.result?.actual,
+          // Rank: consistency first, then how realistic (close to the projection) the line is, then model chance.
+          score: 0.45 * hitRate + 0.35 * Math.min(1, line / e.mean) + 0.2 * e.pOver,
+        });
+      }
+    }
+    // Keep each player's single best stat so the list isn't one player repeated.
+    const bestByPlayer = new Map();
+    for (const p of out.sort((a, b) => b.score - a.score)) if (!bestByPlayer.has(p.playerId)) bestByPlayer.set(p.playerId, p);
+    return [...bestByPlayer.values()];
+  }, [ctx, rows, target, gameByTeam]);
+
+  const shown = picks.filter((p) => (pos === 'ALL' || p.pos === pos) && (!upcoming || p.state === 'pre'));
+  const upcomingCount = picks.filter((p) => p.state === 'pre').length;
+
+  return (
+    <section className="hc">
+      <div className="pboard-head">
+        <div>
+          <h2 className="qc-title">Highest-chance props</h2>
+          <p className="muted small">
+            For every player and stat, the highest line that still has a {Math.round(target * 100)}%+ model chance to go <strong>More</strong>, kept only if the player has cleared it in most recent games. Injured and questionable players are left out.
+            If PrizePicks shows a line <strong>at or below</strong> one of these numbers (Goblin lines often are), it’s a high-chance More.
+          </p>
+        </div>
+        <span className="pboard-count">{shown.length} <small>picks</small></span>
+      </div>
+      <div className="toolbar">
+        <Segmented options={[{ value: 0.7, label: '70%+' }, { value: 0.75, label: '75%+' }, { value: 0.8, label: '80%+' }]} value={target} onChange={setTarget} label="Minimum chance" />
+        <Segmented options={['ALL', ...SKILL]} value={pos} onChange={setPos} label="Position" />
+        <label className="check"><input type="checkbox" checked={upcoming} onChange={(e) => setUpcoming(e.target.checked)} /> Upcoming games only</label>
+      </div>
+      {shown.length === 0 ? (
+        <Empty title={upcoming && upcomingCount === 0 ? 'No upcoming games left this week' : 'No picks clear this bar'}>
+          {upcoming && upcomingCount === 0 ? 'Untick “Upcoming games only” to see how this week’s picks did, or check back when next week’s projections post.' : 'Try 70%+ or another position.'}
+        </Empty>
+      ) : (
+        <>
+          <div className="hc-grid">
+            {shown.slice(0, limit).map((p, i) => (
+              <article key={p.key} className={`hc-card ${p.state !== 'pre' ? 'played' : ''}`}>
+                <button type="button" className="hc-top" onClick={() => openPlayer(p.playerId)}>
+                  <span className="hc-rank">{i + 1}</span>
+                  <Avatar player={{ id: p.playerId, pos: p.pos, team: p.team, first: p.first, last: p.last }} size={40} />
+                  <span className="hc-name"><strong>{p.player}</strong><small>{p.pos} · {p.team} vs {p.opp}{p.state === 'pre' && p.date ? ` · ${kickoff(p.date)}` : ''}</small></span>
+                </button>
+                <div className="hc-line">
+                  <span className="hc-side">MORE</span>
+                  <strong>{p.line}</strong>
+                  <span className="hc-stat">{p.statLabel}</span>
+                </div>
+                <div className="hc-meter" title={`${Math.round(p.prob * 100)}% model chance`}><span style={{ width: `${p.prob * 100}%` }} /></div>
+                <div className="hc-foot">
+                  <span><strong>{Math.round(p.prob * 100)}%</strong> chance</span>
+                  <span>Hit <strong>{p.hits}/{p.n}</strong> recent</span>
+                  <span>Model <strong>{f1(p.mean)}</strong></span>
+                </div>
+                <div className="hc-bottom">
+                  <HitDots recent={p.recent} line={p.line} />
+                  {p.state !== 'pre' && p.actual != null ? (
+                    <span className={`result-chip ${p.state === 'post' ? (p.actual > p.line ? 'hit' : 'miss') : 'live'}`}>{p.state === 'post' ? (p.actual > p.line ? 'HIT' : 'MISS') : 'LIVE'} · {f1(p.actual)}</span>
+                  ) : (
+                    <button type="button" className={`star ${saved[p.key] ? 'on' : ''}`} title="Save to your lines" aria-label="Save pick" onClick={() => { onSave({ player: p.player, market: p.market, line: p.line }); setSaved((x) => ({ ...x, [p.key]: true })); }}>{saved[p.key] ? '★' : '☆'}</button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+          {shown.length > limit && <button type="button" className="more-btn card" onClick={() => setLimit((l) => l + 12)}>Show more · {shown.length - limit} remaining</button>}
+          <SlipBuilder
+            title="Safest slip builder"
+            subtitle="Stacks the highest-chance picks above, one per game, so a single game can’t sink the whole entry"
+            picks={shown.map((p) => ({ ...p, stat: p.stat }))}
+          />
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Builds a 2–6 leg entry from the highest-probability picks, max one per game. */
+function SlipBuilder({ title, subtitle, picks }) {
+  const [size, setSize] = useState(3);
+  const legs = [];
+  const used = new Set();
+  for (const p of [...picks].sort((a, b) => b.prob - a.prob)) {
+    if (legs.length >= size) break;
+    if (used.has(p.game)) continue;
+    used.add(p.game);
+    legs.push(p);
+  }
+  if (picks.length < 2) return null;
+  const combined = legs.reduce((a, p) => a * p.prob, 1);
+  return (
+    <div className="slip">
+      <div className="slip-head">
+        <div>
+          <h3 className="slip-title">{title}</h3>
+          <p className="muted small">{subtitle}</p>
+        </div>
+        <Segmented size="sm" options={[2, 3, 4, 5, 6].map((n) => ({ value: n, label: `${n} picks` }))} value={size} onChange={setSize} label="Slip size" />
+      </div>
+      <ol className="slip-legs">
+        {legs.map((p) => (
+          <li key={p.key}>
+            <span className="slip-player"><strong>{p.player}</strong><small>{p.team} vs {p.opp}</small></span>
+            <span className={`slip-pick ${p.side}`}>{p.side === 'over' ? 'More' : 'Less'} {p.line} {p.stat}</span>
+            <span className="slip-prob">{Math.round(p.prob * 100)}%</span>
+          </li>
+        ))}
+      </ol>
+      <div className="slip-total">
+        <span>All {legs.length} hit (model estimate)</span>
+        <strong>{Math.round(combined * 100)}%</strong>
+      </div>
+      {legs.length < size && <p className="muted small">Only {legs.length} games have a qualifying pick right now.</p>}
+      <p className="muted small slip-note">Each leg is a separate estimate. Real results vary, so play only what you can afford to lose.</p>
     </div>
   );
 }

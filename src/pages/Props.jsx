@@ -621,6 +621,13 @@ function PlayerBoard({ ctx, rows, feed, manual, onSave }) {
   }, [players, q, pos, team, sort, hideStarted, gameByTeam]);
 
   useEffect(() => setLimit(PAGE), [q, pos, team, sort, hideStarted]);
+  // Opened from the floating search button: jump to and focus the player search.
+  useEffect(() => {
+    if (!ctx) return;
+    let flag = null;
+    try { flag = sessionStorage.getItem('ge:focusSearch'); sessionStorage.removeItem('ge:focusSearch'); } catch { /* ignore */ }
+    if (flag) setTimeout(() => { const el = document.getElementById('pb-search'); el?.scrollIntoView({ block: 'center' }); el?.focus(); }, 300);
+  }, [ctx]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!ctx) return null;
 
   return (

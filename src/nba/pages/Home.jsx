@@ -1,4 +1,5 @@
 import HomeFeed from '../../components/HomeFeed.jsx';
+import { DateStrip, GamesSection, InjuriesSection, PerformerPill, StreaksSection, useNbaDays } from '../../components/HomeSections.jsx';
 import { useState } from 'react';
 import { useData } from '../../data.jsx';
 import { GameStatus } from '../../components/shell.jsx';
@@ -12,6 +13,14 @@ export default function NbaHome() {
   const rows = useNbaRows();
   const outlook = useNbaOutlook();
   const [grp, setGrp] = useState('ALL');
+  const { date, setDate } = useData();
+  const days = useNbaDays();
+  const spreadOf = (g) => {
+    const h = outlook?.teams.find((t) => t.abbr === g.home.abbr);
+    if (!h) return null;
+    const m = Math.round(Math.abs(h.margin) * 2) / 2;
+    return m < 0.5 ? 'Pick’em (proj)' : `${h.margin > 0 ? g.home.abbr : g.away.abbr} by ${m} (proj)`;
+  };
 
   if (!core || !rows) {
     if (error) return null;
@@ -45,7 +54,12 @@ export default function NbaHome() {
 
   return (
     <div className="page">
-      <HomeFeed sport="nba" />
+      <DateStrip days={days} value={date} onChange={setDate} />
+      <GamesSection games={board.games} sport="nba" spreadOf={spreadOf} onStandings={() => { window.location.hash = '/nba/teams'; }} />
+      <InjuriesSection sport="nba" />
+      <StreaksSection sport="nba" />
+      <HomeFeed sport="nba" rail={false} />
+      <PerformerPill sport="nba" />
       <section className="hero">
         <div>
           <p className="eyebrow">{core.label} NBA season</p>

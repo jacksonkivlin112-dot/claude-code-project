@@ -145,8 +145,8 @@ export function useRoute() {
     const h = window.location.hash.replace(/^#\/?/, '');
     const [rawPath, qs] = h.split('?');
     const parts = (rawPath || '').split('/').filter(Boolean);
-    const sport = parts[0] === 'nba' ? 'nba' : 'nfl';
-    if (sport === 'nba') parts.shift();
+    const sport = parts[0] === 'nba' || parts[0] === 'tennis' ? parts[0] : 'nfl';
+    if (sport !== 'nfl') parts.shift();
     return { sport, path: parts[0] || 'home', params: new URLSearchParams(qs || '') };
   };
   const [route, setRoute] = useState(parse);
@@ -160,7 +160,7 @@ export function useRoute() {
 
 export function navigate(path, params, sport = 'nfl') {
   const qs = params ? `?${new URLSearchParams(params)}` : '';
-  window.location.hash = `/${sport === 'nba' ? 'nba/' : ''}${path}${qs}`;
+  window.location.hash = `/${sport === 'nfl' ? '' : `${sport}/`}${path}${qs}`;
 }
 
 export function usePersistentState(key, initial) {

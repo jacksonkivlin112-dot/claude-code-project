@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '17 9 * * *'        # daily
+    - cron: '41 11-20/3 * * *'  # tennis (European/US daytime)
     - cron: '7,37 17-23 * * 0'  # Sunday game window (UTC), every 30 min
     - cron: '7 0-5 * * 1'       # Sunday night / early Monday
     - cron: '7 0-4 * * 2,5'     # Monday & Thursday night games
@@ -38,6 +39,8 @@ jobs:
         run: npm run data
       - name: Refresh NBA ESPN snapshot
         run: npm run data:nba
+      - name: Refresh tennis scores, rankings and ratings
+        run: npm run data:tennis
       - name: Refresh sportsbook prop lines (DraftKings via ESPN, free)
         run: npm run lines && npm run lines:nba
       - name: Refresh PrizePicks lines (needs ODDS_API_KEY secret)

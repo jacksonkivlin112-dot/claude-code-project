@@ -73,3 +73,9 @@ Data: Sleeper NBA season totals, per-game box scores and per-game projections, p
 - **Calibration**: the backtest showed raw spreads were too tight (75% lines hit ~64%), so highest-chance lines now use a 1.5× spread (`SAFE_SD_MULT`), which brings replayed hit rates back to target.
 - **My Slips** (`#/slips`): save any slip from Props, the Parlay Builder or Slip Scan and follow each leg live, with optional alerts.
 - **Install**: web app manifest + service worker; "Install the app" lives in the menu.
+
+## Tennis (`#/tennis/...`)
+
+- **Data**: `scripts/fetch-espn-tennis.mjs` pulls ATP/WTA draws, scores and rankings from ESPN plus every singles result since the start of last season (incremental after the first run; `--full` rebuilds).
+- **Model** (`src/tennis/model.js`): Elo ratings from all results, shrunk toward 50/50 by a factor fit on the first two-thirds of the season and checked on the last third. Win chance is converted to a per-game probability, which drives set-score odds, total-games odds and live win chances from any score.
+- **Pages**: Matches (live scores + win %), Match (odds, form, head-to-head), Picks & Parlays, Rankings (official + model rating), Model Record.

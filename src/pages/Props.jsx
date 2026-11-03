@@ -6,6 +6,7 @@ import { parseManualNba } from '../nba/props.js';
 import { useProjectionRows, useTeamOutlook } from '../components/players.jsx';
 import { SaveSlipButton } from '../components/Tracking.jsx';
 import { gradePicks, logPicks } from '../tracker.js';
+import { useLineCalibration } from '../lineCal.js';
 import { Avatar, Card, Empty, InjuryDot, PosBadge, Segmented, SkeletonRows, TeamLogo, WeeklyBars, f1, kickoff, timeAgo, useNow, useUi } from '../components/ui.jsx';
 
 const lsKeys = (sport) => {
@@ -173,6 +174,7 @@ export function useNflContext() {
   const { core, season, ranks, liveById, gameByTeam, teams } = useData();
   const rows = useProjectionRows(core?.week);
   const outlook = useTeamOutlook();
+  const lineCal = useLineCalibration('nfl');
   const ctx = useMemo(() => {
     if (!rows || !outlook) return null;
     return {
@@ -184,8 +186,9 @@ export function useNflContext() {
       liveById,
       gameByTeam,
       week: core?.week,
+      lineCal,
     };
-  }, [rows, outlook, season, ranks, liveById, gameByTeam, teams, core]);
+  }, [rows, outlook, season, ranks, liveById, gameByTeam, teams, core, lineCal]);
   return { ctx, rows };
 }
 
@@ -276,6 +279,7 @@ function PropsBody({ ctx, rows, P }) {
         <>
           {P.lines.length > 0 && (
             <>
+              <LineCalNote cal={ctx?.lineCal} none={best.length === 0} />
               {best.length > 0 && (
                 <section>
                   <div className="section-head"><h2>Best plays</h2><span className="muted small">Highest model confidence among open lines</span></div>
@@ -343,6 +347,25 @@ function PropsBody({ ctx, rows, P }) {
       <p className="disclaimer">
         Model estimates for research and entertainment only, with no guaranteed outcomes. Gridiron Edge is not affiliated with PrizePicks, DraftKings or ESPN. Sportsbook lines come from ESPN and PrizePicks lines from The Odds API; both can lag the apps, so always confirm the current line before entering. Play responsibly. 18+/21+ where legal. Help: 1-800-GAMBLER.
       </p>
+    </div>
+  );
+}
+
+/** How much the model is trusted against real lines, and why. */
+function LineCalNote({ cal, none }) {
+  const cfg = useCfg();
+  if (!cal) return null;
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  return (
+    <div className={`calnote ${none ? 'empty' : ''}`}>
+      <strong>{none ? 'No edges against the sportsbook right now' : 'Calibrated to the line'}</strong>
+      <span>
+        {cal.usingDefault
+          ? `Sportsbook lines are sharp, so the app trusts only ${pct(cal.s)} of the model’s lean until at least 300 graded ${cfg.sport.toUpperCase()} lines show it beats the line (${cal.n} graded so far).`
+          : `Checked on ${cal.n.toLocaleString()} graded ${cfg.sport.toUpperCase()} lines: when the model was 70%+ sure, its side hit ${cal.modelSide70 ? pct(cal.modelSide70.hit) : '—'}. So the app trusts ${pct(cal.s)} of its lean${cal.b ? ` and adjusts for overs hitting ${pct(cal.overRate)}` : ''}.`}
+        {none && ' Picks show up here automatically if the record improves. Meanwhile, the Highest-chance props below are calibrated separately and have held up in testing.'}
+        {' '}This updates every night.
+      </span>
     </div>
   );
 }

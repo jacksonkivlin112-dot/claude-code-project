@@ -79,7 +79,7 @@ export default function GameProps({ game, sport }) {
       <section>
         <h3 className="gp-h">Player prop lines <small>{lines.length ? `${[...new Set(lines.map((e) => e.book).filter(Boolean))].join(' + ')} · model pick on each` : ''}</small></h3>
         {lines.length === 0 ? (
-          <p className="muted small gp-empty">{P.lines.length ? 'No graded lines for this game right now.' : 'No lines posted for this game yet. Sportsbooks usually post player props a day or two before kickoff/tip-off.'}</p>
+          <p className="muted small gp-empty">{P.lines.length ? 'No edges against the sportsbook for this game: the model doesn’t beat these lines often enough to call a side. The highest-chance lines below are calibrated separately.' : 'No lines posted for this game yet. Sportsbooks usually post player props a day or two before kickoff/tip-off.'}</p>
         ) : (
           <ol className="gp-list">
             {lines.map((e) => (

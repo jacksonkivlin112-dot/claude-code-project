@@ -68,13 +68,17 @@ async function games() {
       const wk = cur?.week?.number;
       const type = cur?.season?.type ?? 2;
       const next = wk ? await json(`${SITE}/scoreboard?week=${wk + 1}&seasontype=${type}`).catch(() => null) : null;
+      if (next && wk) next.__week = wk + 1;
+      if (cur && wk) cur.__week = wk;
       return [cur, next].filter(Boolean);
     })();
   const seen = new Set();
+  const weekOf = new Map();
+  for (const b of boards) for (const e of b?.events || []) if (b.__week) weekOf.set(e.id, b.__week);
   return boards.flatMap((b) => b?.events || []).filter((e) => !seen.has(e.id) && seen.add(e.id)).map((e) => {
     const c = e.competitions[0];
     const side = (h) => c.competitors.find((x) => x.homeAway === h).team;
-    return { id: e.id, date: e.date, state: e.status.type.state, home: side('home'), away: side('away') };
+    return { id: e.id, date: e.date, state: e.status.type.state, home: side('home'), away: side('away'), week: e.week?.number ?? weekOf.get(e.id) ?? null };
   });
 }
 
@@ -110,7 +114,7 @@ async function propsFor(g) {
     const open = it.open?.target?.value;
     out.set(id, {
       id, player, market, line, eventId: g.id, home: g.home.displayName, away: g.away.displayName, commence: g.date,
-      updated: it.lastUpdated || null, book: PROVIDER.name, espnId: athleteId,
+      updated: it.lastUpdated || null, book: PROVIDER.name, espnId: athleteId, ...(g.week ? { week: g.week } : {}),
       ...(open != null && open !== line ? { openLine: open } : {}),
     });
   }
@@ -140,6 +144,13 @@ try {
   // because no lines are posted yet: stale lines would be matched to the next slate.
   if (pre.length && failed.length === pre.length && !fresh.length) { console.log('Every game failed to load; keeping the previous file.'); process.exit(0); }
   await mkdir(dirname(OUT), { recursive: true });
+  // Archive: the latest pre-game line for every player/stat, graded later by calibrate-lines.mjs.
+  const HIST = OUT.replace('lines.json', 'lines-history.json');
+  let hist = { entries: {} };
+  try { hist = JSON.parse(await readFile(HIST, 'utf8')); } catch { /* first run */ }
+  for (const p of fresh) hist.entries[`${p.eventId}|${p.id}`] = { id: p.id, player: p.player, market: p.market, line: p.line, eventId: p.eventId, commence: p.commence, ...(p.week ? { week: p.week } : {}) };
+  for (const [k, v] of Object.entries(hist.entries)) if (now - new Date(v.commence).getTime() > 5 * 864e5) delete hist.entries[k];
+  await writeFile(HIST, JSON.stringify(hist));
   await writeFile(OUT, JSON.stringify({ generatedAt: new Date().toISOString(), source: 'espn', book: PROVIDER.name, sport, props }));
   const byMarket = {};
   for (const p of fresh) byMarket[p.market] = (byMarket[p.market] || 0) + 1;

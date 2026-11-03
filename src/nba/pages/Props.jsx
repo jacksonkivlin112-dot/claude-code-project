@@ -4,6 +4,7 @@ import { MARKETS_NBA } from '../../oddsapi.js';
 import { PropsPage } from '../../pages/Props.jsx';
 import { DateNav, useNbaOutlook, useNbaRows } from '../components.jsx';
 import { NBA_ALIASES, buildNbaLookups, evaluateNbaProp, parseManualNba } from '../props.js';
+import { useLineCalibration } from '../../lineCal.js';
 
 const ALL = Object.keys(MARKETS_NBA);
 
@@ -44,6 +45,7 @@ export function useNbaContext() {
   const { season, dvp, b2b, liveById, gameByTeam, teams } = useData();
   const rows = useNbaRows();
   const outlook = useNbaOutlook();
+  const lineCal = useLineCalibration('nba');
   const ctx = useMemo(() => {
     if (!rows || !outlook) return null;
     return {
@@ -55,8 +57,9 @@ export function useNbaContext() {
       leagueAvg: outlook.leagueAvg,
       liveById,
       gameByTeam,
+      lineCal,
     };
-  }, [rows, outlook, season, dvp, b2b, liveById, gameByTeam, teams]);
+  }, [rows, outlook, season, dvp, b2b, liveById, gameByTeam, teams, lineCal]);
   return { ctx, rows };
 }
 

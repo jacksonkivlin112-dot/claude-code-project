@@ -12,7 +12,7 @@
 
 import { MARKETS_NBA, normName } from '../oddsapi.js';
 import { ordinal } from '../model.js';
-import { BREAKEVEN, GRADES, parseManual, probabilities } from '../propsModel.js';
+import { BREAKEVEN, GRADES, calibrateLine, parseManual, probabilities } from '../propsModel.js';
 import { groupName } from './model.js';
 
 const STAT_KEY = {
@@ -114,7 +114,7 @@ export function evaluateNbaProp(prop, ctx) {
     sd = Math.sqrt((n * sampleSd ** 2 + k * prior ** 2) / (n + k));
     sd = Math.max(sd, 0.12 * mean, 1);
   }
-  const p = probabilities(dist, mean, sd, prop.line);
+  const p = calibrateLine(probabilities(dist, mean, sd, prop.line), prop, ctx.lineCal);
   const side = p.over >= p.under ? 'over' : 'under';
   const prob = Math.max(p.over, p.under);
   let grade = GRADES.find((g) => prob >= g.min);
@@ -171,6 +171,11 @@ export function evaluateNbaProp(prop, ctx) {
     result = { actual, final, hit: final ? hit : null };
   }
 
+  if (p.calibrated) {
+    const raw = side === 'over' ? p.rawOver : p.rawUnder;
+    const cal = ctx.lineCal;
+    reasons.push({ tone: 'neutral', text: `Sportsbook lines are sharp${cal?.n ? `: on ${cal.n.toLocaleString()} graded lines the model's confident leans hit ${cal.modelSide70 ? Math.round(cal.modelSide70.hit * 100) : '—'}%` : ''}, so this chance is pulled toward 50/50 (model alone said ${Math.round(raw * 100)}%).` });
+  }
   return {
     ...common,
     commence: prop.commence || g?.date,

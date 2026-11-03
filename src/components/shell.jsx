@@ -18,8 +18,16 @@ const NBA_NAV = [
   { path: 'matchups', label: 'Matchups', menuOnly: true, icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
 ];
 
-const navFor = (sport) => (sport === 'nba' ? NBA_NAV : NAV);
-const href = (sport, path) => `#/${sport === 'nba' ? 'nba/' : ''}${path}`;
+const TENNIS_NAV = [
+  { path: 'home', label: 'Matches', short: 'Matches', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8' },
+  { path: 'picks', label: 'Picks & Parlays', short: 'Picks', icon: 'M4 6h11M4 12h8M4 18h11M18 5l3 3-3 3M18 13l3 3-3 3' },
+  { path: 'rankings', label: 'Rankings', icon: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4' },
+  { path: 'record', label: 'Model Record', short: 'Record', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
+];
+const navFor = (sport) => (sport === 'nba' ? NBA_NAV : sport === 'tennis' ? TENNIS_NAV : NAV);
+const href = (sport, path) => `#/${sport === 'nfl' ? '' : `${sport}/`}${path}`;
+const SPORTS_LIST = ['nfl', 'nba', 'tennis'];
+const SPORT_NAME = { nfl: 'NFL', nba: 'NBA', tennis: 'Tennis' };
 
 const NAV = [
   { path: 'home', label: 'This Week', short: 'Week', icon: 'M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10' },
@@ -62,10 +70,10 @@ function SportSwitch({ route }) {
   };
   return (
     <div className="sport-switch" role="radiogroup" aria-label="Sport">
-      {['nfl', 'nba'].map((s) => (
+      {SPORTS_LIST.map((s) => (
         <button key={s} type="button" role="radio" aria-checked={route.sport === s} className={route.sport === s ? 'on' : ''} onClick={() => go(s)}>
           <span className={`sport-ico ${s}`} aria-hidden />
-          {s.toUpperCase()}
+          {SPORT_NAME[s].toUpperCase()}
         </button>
       ))}
     </div>
@@ -76,7 +84,9 @@ export function Header({ route }) {
   const { core, fmt, setFmt, updatedAt, reload, loading, anyLive, date } = useData();
   const nav = navFor(route.sport);
   const pill = core
-    ? core.sport === 'nba'
+    ? core.sport === 'tennis'
+      ? `Tennis · ${core.label}`
+      : core.sport === 'nba'
       ? `${core.label} · ${date ? new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) : ''}`
       : `${core.season} · Week ${core.week}`
     : null;
@@ -211,11 +221,11 @@ function InstallApp() {
 function LeagueTabs({ route, anyLive }) {
   return (
     <nav className="league-tabs" aria-label="League">
-      {['nfl', 'nba'].map((s) => {
+      {SPORTS_LIST.map((s) => {
         const target = navFor(s).some((n) => n.path === route.path) ? route.path : 'home';
         return (
           <a key={s} href={href(s, target)} className={route.sport === s ? 'on' : ''}>
-            {s.toUpperCase()}
+            {SPORT_NAME[s]}
             {route.sport === s && anyLive && <span className="lt-dot" aria-label="Live games" />}
           </a>
         );
@@ -228,7 +238,7 @@ const DOCK = ['home', 'props', 'parlays', 'scan', 'slips'];
 
 /** Floating rounded bottom bar with the main sections, plus a separate search button. */
 export function MobileNav({ route }) {
-  const items = navFor(route.sport).filter((n) => DOCK.includes(n.path)).sort((a, b) => DOCK.indexOf(a.path) - DOCK.indexOf(b.path));
+  const items = route.sport === 'tennis' ? navFor('tennis') : navFor(route.sport).filter((n) => DOCK.includes(n.path)).sort((a, b) => DOCK.indexOf(a.path) - DOCK.indexOf(b.path));
   return (
     <div className="dock">
       <nav className="mobile-nav" aria-label="Primary mobile">
@@ -240,7 +250,7 @@ export function MobileNav({ route }) {
       </nav>
       <a
         className="dock-search"
-        href={href(route.sport, 'props')}
+        href={href(route.sport, route.sport === 'tennis' ? 'rankings' : 'props')}
         aria-label="Search players"
         onClick={() => { try { sessionStorage.setItem('ge:focusSearch', '1'); } catch { /* ignore */ } }}
       >

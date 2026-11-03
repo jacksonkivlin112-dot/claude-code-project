@@ -15,6 +15,13 @@ import Stats from './pages/Stats.jsx';
 import Teams from './pages/Teams.jsx';
 import { NbaPlayerPanel, NbaTeamPanel } from './nba/components.jsx';
 import { NbaDataProvider } from './nba/data.jsx';
+import { TennisDataProvider } from './tennis/data.jsx';
+import { TennisPlayerPanel } from './tennis/components.jsx';
+import TennisHome from './tennis/pages/Home.jsx';
+import TennisMatch from './tennis/pages/Match.jsx';
+import TennisPicks from './tennis/pages/Picks.jsx';
+import TennisRankings from './tennis/pages/Rankings.jsx';
+import TennisRecord from './tennis/pages/Record.jsx';
 import NbaGame from './nba/pages/Game.jsx';
 import NbaHome from './nba/pages/Home.jsx';
 import NbaMatchups from './nba/pages/Matchups.jsx';
@@ -40,6 +47,13 @@ const SPORTS = {
     credit: 'Box scores & projections via Sleeper · Scores, standings & logos via ESPN',
     footer: (core) => (core ? `${core.label} season · data refreshes automatically every night` : ''),
   },
+  tennis: {
+    Provider: TennisDataProvider,
+    pages: { home: TennisHome, match: TennisMatch, picks: TennisPicks, rankings: TennisRankings, record: TennisRecord },
+    panels: { PlayerPanelC: TennisPlayerPanel, TeamPanelC: TennisPlayerPanel },
+    credit: 'Scores, draws & rankings via ESPN · Player ratings built from every result since last season',
+    footer: () => 'Tennis data refreshes daily, live scores every 30 seconds',
+  },
 };
 
 function Shell({ route, sport }) {
@@ -50,7 +64,7 @@ function Shell({ route, sport }) {
     <>
       <Header route={route} />
       {/* Home has its own swipeable game cards; game pages go full screen. */}
-      {route.path !== 'game' && route.path !== 'home' && <Ticker />}
+      {route.path !== 'game' && route.path !== 'home' && route.sport !== 'tennis' && <Ticker />}
       <main className="main">
         {error && (
           <div className="banner error" role="alert">

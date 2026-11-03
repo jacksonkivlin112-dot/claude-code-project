@@ -43,6 +43,8 @@ jobs:
         run: npm run data:tennis
       - name: Refresh sportsbook prop lines (DraftKings via ESPN, free)
         run: npm run lines && npm run lines:nba
+      - name: Grade past lines and recalibrate trust in the model
+        run: npm run calibrate
       - name: Refresh PrizePicks lines (needs ODDS_API_KEY secret)
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}

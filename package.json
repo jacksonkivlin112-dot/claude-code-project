@@ -13,7 +13,8 @@
     "props:nba": "node scripts/fetch-props.mjs nba",
     "lines": "node scripts/fetch-espn-lines.mjs nfl",
     "lines:nba": "node scripts/fetch-espn-lines.mjs nba",
-    "data:tennis": "node scripts/fetch-espn-tennis.mjs"
+    "data:tennis": "node scripts/fetch-espn-tennis.mjs",
+    "calibrate": "node scripts/calibrate-lines.mjs nfl && node scripts/calibrate-lines.mjs nba"
   },
   "dependencies": {
     "react": "^18.3.1",

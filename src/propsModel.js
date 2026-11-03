@@ -43,6 +43,19 @@ function poissonCdf(k, lambda) {
 }
 
 /** P(over), P(under) — pushes on whole-number lines are excluded. */
+/**
+ * Sportsbook lines are sharp. Pull the model's chance toward 50/50 by the amount measured
+ * on graded real lines (scripts/calibrate-lines.mjs): over' = 0.5 + s * (over - 0.5) + b.
+ * Model-made floor lines (ids starting "h") are calibrated separately and left alone.
+ */
+export function calibrateLine(p, prop, cal) {
+  if (!cal || String(prop.id || '').startsWith('h')) return p;
+  const tot = p.over + p.under;
+  if (!(tot > 0)) return p;
+  const q = Math.min(0.99, Math.max(0.01, 0.5 + cal.s * (p.over / tot - 0.5) + (cal.b || 0)));
+  return { ...p, over: q * tot, under: (1 - q) * tot, rawOver: p.over, rawUnder: p.under, calibrated: true };
+}
+
 export function probabilities(dist, mean, sd, line) {
   if (dist === 'poisson') {
     const lam = Math.max(mean, 0.01);
@@ -146,7 +159,7 @@ export function evaluateProp(prop, ctx) {
     sd = Math.max(sd, 0.15 * mean, 1);
   }
 
-  const p = probabilities(M.dist, mean, sd, prop.line);
+  const p = calibrateLine(probabilities(M.dist, mean, sd, prop.line), prop, ctx.lineCal);
   const side = p.over >= p.under ? 'over' : 'under';
   const prob = Math.max(p.over, p.under);
   let grade = GRADES.find((g) => prob >= g.min);
@@ -217,6 +230,11 @@ export function evaluateProp(prop, ctx) {
     result = { actual, final, hit: final ? hit : null, onPace: !final ? hit : null };
   }
 
+  if (p.calibrated) {
+    const raw = side === 'over' ? p.rawOver : p.rawUnder;
+    const cal = ctx.lineCal;
+    reasons.push({ tone: 'neutral', text: `Sportsbook lines are sharp${cal?.n ? `: on ${cal.n.toLocaleString()} graded lines the model's confident leans hit ${cal.modelSide70 ? Math.round(cal.modelSide70.hit * 100) : '—'}%` : ''}, so this chance is pulled toward 50/50 (model alone said ${Math.round(raw * 100)}%).` });
+  }
   return {
     ...prop,
     inactive,

@@ -47,6 +47,7 @@ async function json(url, tries = 3) {
   for (let i = 0; ; i++) {
     try {
       const r = await fetch(url, { headers: { accept: 'application/json' } });
+      if (r.status === 404) return null; // e.g. no props posted for this game yet
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.json();
     } catch (e) {
@@ -61,8 +62,16 @@ const ymd = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_Yor
 async function games() {
   const boards = sport === 'nba'
     ? await Promise.all([0, 1].map((k) => json(`${SITE}/scoreboard?dates=${ymd(new Date(Date.now() + k * 864e5))}`)))
-    : [await json(`${SITE}/scoreboard`)];
-  return boards.flatMap((b) => b.events || []).map((e) => {
+    : await (async () => {
+      // The default NFL board can still show last week; look one week ahead too.
+      const cur = await json(`${SITE}/scoreboard`);
+      const wk = cur?.week?.number;
+      const type = cur?.season?.type ?? 2;
+      const next = wk ? await json(`${SITE}/scoreboard?week=${wk + 1}&seasontype=${type}`).catch(() => null) : null;
+      return [cur, next].filter(Boolean);
+    })();
+  const seen = new Set();
+  return boards.flatMap((b) => b?.events || []).filter((e) => !seen.has(e.id) && seen.add(e.id)).map((e) => {
     const c = e.competitions[0];
     const side = (h) => c.competitors.find((x) => x.homeAway === h).team;
     return { id: e.id, date: e.date, state: e.status.type.state, home: side('home'), away: side('away') };
@@ -73,7 +82,7 @@ const rosterCache = new Map();
 async function roster(teamId) {
   if (!rosterCache.has(teamId)) {
     rosterCache.set(teamId, json(`${SITE}/teams/${teamId}/roster`).then((d) => {
-      const list = (d.athletes || []).flatMap((a) => (a.items ? a.items : [a]));
+      const list = (d?.athletes || []).flatMap((a) => (a.items ? a.items : [a]));
       return new Map(list.map((a) => [String(a.id), a.fullName || a.displayName]));
     }).catch(() => new Map()));
   }
@@ -85,6 +94,7 @@ async function propsFor(g) {
   const items = [];
   for (let page = 1; page <= 5; page++) {
     const d = await json(`${CORE}/events/${g.id}/competitions/${g.id}/odds/${PROVIDER.id}/propBets?lang=en&region=us&limit=1000&page=${page}`);
+    if (!d) break;
     items.push(...(d.items || []));
     if (page >= (d.pageCount || 1)) break;
   }
@@ -126,7 +136,9 @@ try {
   const kept = (old.props || []).filter((p) => !refreshed.has(p.eventId) && now - new Date(p.commence).getTime() < 12 * 3600e3);
   const prev = Object.fromEntries((old.props || []).map((p) => [p.id, p.line]));
   const props = [...kept, ...fresh.map((p) => (prev[p.id] != null && prev[p.id] !== p.line ? { ...p, prevLine: prev[p.id] } : p))];
-  if (!props.length && (old.props || []).length) { console.log('No lines found this run; keeping the previous file.'); process.exit(0); }
+  // Only keep the old file if every game failed to load (a network problem), never just
+  // because no lines are posted yet: stale lines would be matched to the next slate.
+  if (pre.length && failed.length === pre.length && !fresh.length) { console.log('Every game failed to load; keeping the previous file.'); process.exit(0); }
   await mkdir(dirname(OUT), { recursive: true });
   await writeFile(OUT, JSON.stringify({ generatedAt: new Date().toISOString(), source: 'espn', book: PROVIDER.name, sport, props }));
   const byMarket = {};

@@ -97,9 +97,11 @@ export function usePropLines(sport) {
       const files = [pp && Array.isArray(pp.props) ? { ...pp, book: 'PrizePicks' } : null, book && Array.isArray(book.props) ? book : null].filter(Boolean);
       if (!files.length) { setSnapshot(false); return; }
       const byId = new Map();
+      // Never show lines from games that are long over (they'd be matched to the next slate).
+      const cutoff = Date.now() - 8 * 3600e3;
       for (const f of files) {
         for (const p of f.props) {
-          if (byId.has(p.id)) continue;
+          if (byId.has(p.id) || (p.commence && new Date(p.commence).getTime() < cutoff)) continue;
           byId.set(p.id, { ...p, book: p.book || f.book, prevLine: p.prevLine ?? p.openLine });
         }
       }
@@ -354,7 +356,11 @@ function SourcePill({ P }) {
       </span>
     );
   }
-  if (P.source === 'snapshot') return <span className="source-pill">{(P.books || ['PrizePicks']).join(' + ')} lines · updated {timeAgo(new Date(P.asOf).getTime())}</span>;
+  if (P.source === 'snapshot') {
+    return P.lines.length
+      ? <span className="source-pill">{(P.books?.length ? P.books : ['PrizePicks']).join(' + ')} lines · updated {timeAgo(new Date(P.asOf).getTime())}</span>
+      : <span className="source-pill muted">No lines posted yet · checked {timeAgo(new Date(P.asOf).getTime())}</span>;
+  }
   if (P.manual.length) return <span className="source-pill">Manual lines</span>;
   return <span className="source-pill muted">No line source</span>;
 }
@@ -517,9 +523,10 @@ function NoLines({ onSetup }) {
   return (
     <Card>
       <div className="nolines">
-        <Empty title="Want every PrizePicks line graded automatically?">
-          Use <strong>All player props</strong> above to check any player and stat. To load and grade the full PrizePicks board on its own, connect a free The Odds API key. PrizePicks has no public feed, and this source carries its lines.
+        <Empty title={`No player prop lines posted for this ${cfg.period === 'week' ? 'week' : 'slate'} yet`}>
+          Sportsbook lines load automatically once DraftKings posts them, usually the day before or the morning of the game{cfg.period === 'week' ? 's' : ''}. Until then, use <strong>Highest-chance props</strong> and <strong>All player props</strong> above to check any player and stat against your own line.
         </Empty>
+        <p className="muted small">Optional extra sources:</p>
         <ol className="steps">
           <li><strong>Site-wide (recommended):</strong> add an <code>ODDS_API_KEY</code> repository secret. The scheduled GitHub Action then refreshes lines for everyone.</li>
           <li><strong>Just this browser:</strong> paste your own The Odds API key under <em>Line sources</em> to auto-refresh lines while this page is open.</li>

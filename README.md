@@ -79,3 +79,10 @@ Data: Sleeper NBA season totals, per-game box scores and per-game projections, p
 - **Data**: `scripts/fetch-espn-tennis.mjs` pulls ATP/WTA draws, scores and rankings from ESPN plus every singles result since the start of last season (incremental after the first run; `--full` rebuilds).
 - **Model** (`src/tennis/model.js`): Elo ratings from all results, shrunk toward 50/50 by a factor fit on the first two-thirds of the season and checked on the last third. Win chance is converted to a per-game probability, which drives set-score odds, total-games odds and live win chances from any score.
 - **Pages**: Matches (live scores + win %), Match (odds, form, head-to-head), Picks & Parlays, Rankings (official + model rating), Model Record.
+
+## Edge AI assistant
+
+- "Ask AI" (header button on phones, floating button on desktop) opens a chat that runs on Claude (default `claude-opus-5-5`; Sonnet 5.5 / Haiku 5.5 selectable).
+- Static site, no backend: the browser calls the Anthropic API directly with the user's own API key, stored only in that browser's localStorage. The SDK loads only when the assistant opens.
+- Tools (`src/ai/tools.js`) read the app's live data and models: games, players, prop model (`evaluate_prop`), posted lines, highest-chance picks, live play-by-play, saved slips, pick record, tennis matches/players.
+- Streaming, prompt caching on the system prompt + tools, server-side refusal fallback (`fallbacks: "default"`), effort `medium`.

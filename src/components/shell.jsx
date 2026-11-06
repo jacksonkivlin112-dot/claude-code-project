@@ -123,6 +123,7 @@ export function Header({ route }) {
         </nav>
         <div className="topbar-tools">
           {setFmt && <span className="fmt-desktop"><Segmented size="sm" label="Scoring format" value={fmt} onChange={setFmt} options={Object.entries(FORMATS).map(([value, v]) => ({ value, label: v.label }))} /></span>}
+          <button type="button" className="ai-hdr" onClick={() => window.dispatchEvent(new Event('ge:open-ai'))} aria-label="Ask the AI assistant"><span aria-hidden>✦</span> AI</button>
           <span className="tool-pill">
           <button type="button" className="icon-btn" onClick={reload} title={updatedAt ? `Updated ${timeAgo(updatedAt)} · click to refresh` : 'Refresh'} aria-label="Refresh data">
             <svg className={loading ? 'spin' : ''} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>

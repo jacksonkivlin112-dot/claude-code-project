@@ -17,6 +17,7 @@
     "calibrate": "node scripts/calibrate-lines.mjs nfl && node scripts/calibrate-lines.mjs nba"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tesseract.js": "^5.1.1"

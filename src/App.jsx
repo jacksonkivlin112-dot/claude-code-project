@@ -1,6 +1,7 @@
 import { DataProvider, useData, useRoute } from './data.jsx';
 import { Overlay } from './components/panels.jsx';
 import { Header, MobileNav, Ticker } from './components/shell.jsx';
+import AiLauncher from './ai/Launcher.jsx';
 import { UiProvider, timeAgo, useNow } from './components/ui.jsx';
 import Game from './pages/Game.jsx';
 import Home from './pages/Home.jsx';
@@ -84,6 +85,7 @@ function Shell({ route, sport }) {
         <span className="muted">{sport.footer(core)} · Projections are estimates, not guarantees.</span>
       </footer>
       <MobileNav route={route} />
+      <AiLauncher sport={route.sport} />
       <Overlay {...sport.panels} />
     </>
   );

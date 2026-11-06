@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getTeamSchedule } from '../api.js';
 import { useData } from '../data.jsx';
 import { grade, ordinal, playerSummary, pts } from '../model.js';
@@ -9,16 +9,28 @@ import { Avatar, Empty, GradeChip, InjuryDot, PosBadge, SkeletonRows, Tag, TeamL
 
 export function Overlay({ PlayerPanelC = PlayerPanel, TeamPanelC = TeamPanel }) {
   const { overlay, close } = useUi();
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  const open = !!overlay;
   useEffect(() => {
-    if (!overlay) return undefined;
-    const on = (e) => e.key === 'Escape' && close();
-    window.addEventListener('keydown', on);
+    if (!open) return undefined;
+    // A history entry for the sheet, so the phone's Back button/swipe closes it.
+    window.history.pushState({ geOverlay: true }, '');
+    const onPop = () => closeRef.current();
+    const onKey = (e) => e.key === 'Escape' && closeRef.current();
+    const onNav = () => closeRef.current(); // a link inside the sheet navigated away
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('hashchange', onNav);
     document.body.classList.add('no-scroll');
     return () => {
-      window.removeEventListener('keydown', on);
+      window.removeEventListener('popstate', onPop);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('hashchange', onNav);
       document.body.classList.remove('no-scroll');
+      if (window.history.state?.geOverlay) window.history.back(); // closed with ✕: drop the entry
     };
-  }, [overlay, close]);
+  }, [open]);
   if (!overlay) return null;
   return (
     <div className="overlay" onClick={close}>

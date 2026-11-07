@@ -71,7 +71,7 @@ export default function PlayerBio({ league, name, espnId }) {
   );
 }
 
-function BioSheet({ league, name, espnId, onClose }) {
+export function BioSheet({ league, name, espnId, onClose }) {
   const [state, setState] = useState({ loading: true });
   useEffect(() => {
     let alive = true;

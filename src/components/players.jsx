@@ -5,7 +5,7 @@ import { Avatar, GradeChip, InjuryDot, PosBadge, Tag, TeamLogo, f1, useUi } from
 
 export function useProjectionRows(week) {
   const { proj, season, ranks, fmt, liveById, core } = useData();
-  const rows = proj[week];
+  const rows = proj?.[week];
   return useMemo(() => {
     if (!rows) return null;
     const actual = core && week === core.week ? liveById : null;

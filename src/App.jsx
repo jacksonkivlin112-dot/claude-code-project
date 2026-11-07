@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { DataProvider, useData, useRoute } from './data.jsx';
 import { Overlay } from './components/panels.jsx';
 import { Header, MobileNav, Ticker } from './components/shell.jsx';
@@ -60,6 +61,7 @@ const SPORTS = {
 function Shell({ route, sport }) {
   const { error, reload, updatedAt, core } = useData();
   useNow(30000);
+  useEffect(() => { document.documentElement.dataset.sport = route.sport; }, [route.sport]);
   const Page = sport.pages[route.path] || sport.pages.home;
   return (
     <>

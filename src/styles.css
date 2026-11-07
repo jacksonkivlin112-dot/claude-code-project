@@ -2197,3 +2197,68 @@ a.tick:hover { box-shadow: var(--glow); }
 .drawer { padding-top: env(safe-area-inset-top, 0px); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .drawer-close { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 12px; width: 42px; height: 42px; z-index: 55; background: rgba(0, 0, 0, 0.6); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); }
 .overlay, .ai-sheet { overscroll-behavior: contain; }
+
+/* ===== Visual polish pass ================================================== */
+/* League colors: NFL purple/blue (default), NBA orange/red, Tennis green/teal. */
+:root[data-sport='nba'] {
+  --accent: #fb923c; --accent-2: #f43f5e; --accent-soft: rgba(251, 146, 60, 0.15);
+  --grad: linear-gradient(135deg, #fed7aa 0%, #fb923c 40%, #f43f5e 100%);
+  --grad-strong: linear-gradient(135deg, #f97316 0%, #ef4444 60%, #e11d48 100%);
+  --glow: 0 0 0 1px rgba(251, 146, 60, 0.25), 0 10px 40px -10px rgba(234, 88, 12, 0.5);
+}
+:root[data-sport='tennis'] {
+  --accent: #4ade80; --accent-2: #22d3ee; --accent-soft: rgba(74, 222, 128, 0.14);
+  --grad: linear-gradient(135deg, #d9f99d 0%, #4ade80 40%, #22d3ee 100%);
+  --grad-strong: linear-gradient(135deg, #16a34a 0%, #0d9488 55%, #0891b2 100%);
+  --glow: 0 0 0 1px rgba(74, 222, 128, 0.25), 0 10px 40px -10px rgba(22, 163, 74, 0.5);
+}
+[data-theme='light'][data-sport='nba'] { --accent: #ea580c; --accent-2: #e11d48; --grad: linear-gradient(135deg, #ea580c 0%, #dc2626 60%, #be123c 100%); }
+[data-theme='light'][data-sport='tennis'] { --accent: #15803d; --accent-2: #0e7490; --grad: linear-gradient(135deg, #16a34a 0%, #0d9488 55%, #0e7490 100%); }
+
+/* Soft league-colored glow behind the top of every page. */
+body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb, var(--accent) 20%, transparent), transparent 72%) no-repeat, var(--bg); background-attachment: fixed; }
+
+/* One clean heading style for sections and cards (brand display type stays on page titles). */
+.card-head h2, .section-head h2, .qc-title, .slip-title, .hs-head h2 {
+  font-family: var(--font-body); font-style: normal; text-transform: none; letter-spacing: -0.02em; font-weight: 800; color: var(--text);
+}
+.section-head h2, .hs-head h2, .qc-title { font-size: 24px; }
+.card-head h2, .slip-title { font-size: 19px; }
+.section-head { margin-top: 18px; gap: 12px; align-items: baseline; }
+.section-head h2::before, .qc-title::before { content: ''; display: inline-block; width: 4px; height: 0.85em; border-radius: 4px; background: var(--grad); margin-right: 10px; vertical-align: -0.05em; }
+.eyebrow { color: var(--accent); }
+
+/* Page heads: tighter, with a league-tinted edge. */
+.hero, .page-head { border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); }
+@media (max-width: 860px) {
+  h1 { font-size: 36px; }
+  .hero, .page-head { padding: 18px 16px; }
+}
+
+/* Long explanations fold to two lines; tap to read the rest. */
+.hero-sub, .pboard-head p.muted, .fold {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; cursor: pointer; position: relative;
+}
+.hero-sub.open, .pboard-head p.muted.open, .fold.open { display: block; -webkit-line-clamp: unset; }
+.hero-sub:not(.open)::after, .pboard-head p.muted:not(.open)::after, .fold:not(.open)::after {
+  content: 'more'; position: absolute; right: 0; bottom: 0; padding-left: 28px; font-weight: 800; color: var(--accent);
+  background: linear-gradient(90deg, transparent, var(--surface) 26px);
+}
+.page-head .hero-sub:not(.open)::after { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 92%, var(--accent)) 26px); }
+
+/* Game cards carry both teams' colors. */
+.gs-card { position: relative; overflow: hidden; background: linear-gradient(110deg, color-mix(in srgb, var(--ac) 16%, var(--surface)) 0%, var(--surface) 42%, var(--surface) 60%, color-mix(in srgb, var(--hc) 12%, var(--surface)) 100%); }
+.gs-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--ac) 0 50%, var(--hc) 50% 100%); }
+.gs-card.in { box-shadow: 0 0 0 1px color-mix(in srgb, var(--live) 50%, transparent), 0 8px 30px -12px color-mix(in srgb, var(--live) 60%, transparent); }
+
+/* Cards and panels: softer depth. */
+.card, .slip, .slipc, .rec-tile, .bt-cell, .calnote { border-radius: 18px; }
+.card { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 100%, transparent), var(--surface)); }
+
+/* Empty states: a glowing icon instead of a gray outline. */
+.empty svg { color: var(--accent); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 55%, transparent)); }
+
+/* Room at the bottom so the floating pill and bar never cover the last row. */
+@media (max-width: 860px) { .main { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 170px); } }
+.calnote { text-align: left; align-items: flex-start; }
+.calnote .fold:not(.open)::after { background: linear-gradient(90deg, transparent, var(--surface) 26px); }

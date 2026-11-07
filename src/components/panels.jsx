@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getTeamSchedule } from '../api.js';
 import PlayerBio from './PlayerBio.jsx';
+import PlayerPage from './PlayerPage.jsx';
 import { useData } from '../data.jsx';
 import { grade, ordinal, playerSummary, pts } from '../model.js';
 import { statLine } from '../pages/Projections.jsx';
@@ -10,6 +11,7 @@ import { Avatar, Empty, GradeChip, InjuryDot, PosBadge, SkeletonRows, Tag, TeamL
 
 export function Overlay({ PlayerPanelC = PlayerPanel, TeamPanelC = TeamPanel }) {
   const { overlay, close } = useUi();
+  const { sport } = useData() || {};
   const closeRef = useRef(close);
   closeRef.current = close;
   const open = !!overlay;
@@ -33,6 +35,14 @@ export function Overlay({ PlayerPanelC = PlayerPanel, TeamPanelC = TeamPanel }) 
     };
   }, [open]);
   if (!overlay) return null;
+  // Football and NBA players get the full-screen player page; tennis and teams keep the side sheet.
+  if (overlay.type === 'player' && sport !== 'tennis') {
+    return (
+      <div className="ppage" role="dialog" aria-modal="true">
+        <PlayerPage id={overlay.id} onClose={close} />
+      </div>
+    );
+  }
   return (
     <div className="overlay" onClick={close}>
       <aside className="drawer" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>

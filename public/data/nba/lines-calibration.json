@@ -1,1 +1,1 @@
-{"generatedAt":"2026-11-07T06:12:37.611Z","sport":"nba","n":2782,"nights":3,"s":0,"b":0,"usingDefault":false,"modelSide70":{"n":695,"hit":0.46618705035971225},"overRate":0.5046728971962616,"logloss":{"coinFlip":0.6931471805599453,"raw":0.7698109135570745,"calibrated":0.6931471805599053}}
+{"generatedAt":"2026-11-07T13:16:43.938Z","sport":"nba","n":3624,"nights":4,"s":0,"b":0,"usingDefault":false,"modelSide70":{"n":922,"hit":0.49023861171366595},"overRate":0.5011037527593819,"logloss":{"coinFlip":0.6931471805599453,"raw":0.7658011233975724,"calibrated":0.693147180559944}}

@@ -92,7 +92,7 @@ export function usePropLines(sport) {
   // workflow) and free sportsbook lines from ESPN (lines.json). PrizePicks wins when both
   // have the same player and stat.
   useEffect(() => {
-    const base = `${import.meta.env.BASE_URL}data/${sport === 'nba' ? 'nba/' : ''}`;
+    const base = `${import.meta.env.BASE_URL}data/${sport && sport !== 'nfl' ? `${sport}/` : ''}`;
     const load = (f) => fetch(base + f, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     Promise.all([load('props.json'), load('lines.json')]).then(([pp, book]) => {
       const files = [pp && Array.isArray(pp.props) ? { ...pp, book: 'PrizePicks' } : null, book && Array.isArray(book.props) ? book : null].filter(Boolean);
@@ -171,10 +171,10 @@ export function usePickLogger(cfg, ctx, rows, evaluated) {
 
 /** NFL: projections, season logs and the team model feed the prop model. */
 export function useNflContext() {
-  const { core, season, ranks, liveById, gameByTeam, teams } = useData();
+  const { core, season, ranks, liveById, gameByTeam, teams, sport } = useData();
   const rows = useProjectionRows(core?.week);
   const outlook = useTeamOutlook();
-  const lineCal = useLineCalibration('nfl');
+  const lineCal = useLineCalibration(sport === 'cfb' ? 'cfb' : 'nfl');
   const ctx = useMemo(() => {
     if (!rows || !outlook) return null;
     return {
@@ -298,7 +298,7 @@ function PropsBody({ ctx, rows, P }) {
               {graded.length > 0 && (
                 <div className="record-bar">
                   <span>Model record this {cfg.period} (graded picks):</span>
-                  <a className="link" href={`#/${cfg.sport === 'nba' ? 'nba/' : ''}record`}>Full record →</a>
+                  <a className="link" href={`#/${cfg.sport !== 'nfl' ? `${cfg.sport}/` : ''}record`}>Full record →</a>
                   <strong className={wins / graded.length >= BREAKEVEN ? 'pos-txt' : 'neg-txt'}>{wins}-{graded.length - wins}</strong>
                   <span className="muted">{Math.round((wins / graded.length) * 100)}% hit rate</span>
                 </div>
@@ -546,9 +546,9 @@ function NoLines({ onSetup }) {
   return (
     <Card>
       <div className="nolines">
-        <Empty title={`No player prop lines posted for this ${cfg.period === 'week' ? 'week' : 'slate'} yet`}>
+        {cfg.noLines ? <Empty title={cfg.noLines.title}>{cfg.noLines.body}</Empty> : <Empty title={`No player prop lines posted for this ${cfg.period === 'week' ? 'week' : 'slate'} yet`}>
           Sportsbook lines load automatically once DraftKings posts them, usually the day before or the morning of the game{cfg.period === 'week' ? 's' : ''}. Until then, use <strong>Highest-chance props</strong> and <strong>All player props</strong> above to check any player and stat against your own line.
-        </Empty>
+        </Empty>}
         <p className="muted small">Optional extra sources:</p>
         <ol className="steps">
           <li><strong>Site-wide (recommended):</strong> add an <code>ODDS_API_KEY</code> repository secret. The scheduled GitHub Action then refreshes lines for everyone.</li>
@@ -1012,7 +1012,7 @@ function SlipBuilder({ title, subtitle, picks }) {
         <span>All {legs.length} hit (model estimate)</span>
         <strong>{Math.round(combined * 100)}%</strong>
       </div>
-      <SaveSlipButton legs={legs} title={`${legs.length}-pick ${cfg.sport.toUpperCase()} slip`} source="builder" />
+      {cfg.sport !== 'cfb' && <SaveSlipButton legs={legs} title={`${legs.length}-pick ${cfg.sport.toUpperCase()} slip`} source="builder" />}
       {legs.length < size && <p className="muted small">Only {legs.length} games have a qualifying pick right now.</p>}
       <p className="muted small slip-note">Each leg is a separate estimate. Real results vary, so play only what you can afford to lose.</p>
     </div>

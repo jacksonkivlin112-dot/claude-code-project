@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getGameSummary } from '../api.js';
-import { useData } from '../data.jsx';
+import { sportPath, useData } from '../data.jsx';
 import { parseSummary } from '../gamecast.js';
 import { buildFeed } from '../liveFeed.js';
 import { getNbaSummary } from '../nba/api.js';
@@ -26,8 +26,9 @@ const SOURCES = {
  * (or today's finished games when nothing is live), newest first.
  */
 export default function HomeFeed({ sport, rail = true }) {
-  const { board, teams } = useData();
-  const src = SOURCES[sport];
+  const { board, teams, api, sport: league } = useData();
+  // Football leagues share the NFL parser; the feed and links follow the active league.
+  const src = sport === 'nfl' ? { ...SOURCES.nfl, get: api?.getGameSummary || SOURCES.nfl.get, href: (id) => `#/${sportPath(league)}game?id=${id}` } : SOURCES[sport];
   const [plays, setPlays] = useState(null); // null = loading, [] = none
   const [failed, setFailed] = useState(false);
   const [limit, setLimit] = useState(12);

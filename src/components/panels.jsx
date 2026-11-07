@@ -201,7 +201,7 @@ function RangeBar({ floor, ceiling, proj, actual }) {
 }
 
 function TeamPanel({ abbr }) {
-  const { teams, standings, core, ranks, gameByTeam, fmt, season } = useData();
+  const { api, teams, standings, core, ranks, gameByTeam, fmt, season } = useData();
   const rows = useProjectionRows(core?.week);
   const outlook = useTeamOutlook();
   const t = teams?.[abbr];
@@ -212,7 +212,7 @@ function TeamPanel({ abbr }) {
 
   useEffect(() => {
     setSched(null);
-    getTeamSchedule(abbr).then(setSched).catch(() => setSched([]));
+    (api?.getTeamSchedule || getTeamSchedule)(abbr).then(setSched).catch(() => setSched([]));
   }, [abbr]);
 
   const players = (rows || []).filter((r) => r.team === abbr && r.pos !== 'DEF').slice(0, 8);

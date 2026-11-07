@@ -1,7 +1,7 @@
 import HomeFeed from '../components/HomeFeed.jsx';
 import { DateStrip, GamesSection, InjuriesSection, PerformerPill, StreaksSection, useNflDays } from '../components/HomeSections.jsx';
 import { useState } from 'react';
-import { useData } from '../data.jsx';
+import { sportPath, useData } from '../data.jsx';
 import { GameStatus } from '../components/shell.jsx';
 import { PlayerLine, useProjectionRows, useTeamOutlook } from '../components/players.jsx';
 import { Avatar, Card, Empty, Meter, Segmented, SkeletonRows, TeamLogo, WinProbBar, f1, kickoff, pct, useUi } from '../components/ui.jsx';
@@ -9,7 +9,7 @@ import { Avatar, Card, Empty, Meter, Segmented, SkeletonRows, TeamLogo, WinProbB
 const POS_TABS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
 
 export default function Home() {
-  const { core, board, loading } = useData();
+  const { core, board, loading, sport: league = 'nfl' } = useData();
   const rows = useProjectionRows(core?.week);
   const outlook = useTeamOutlook();
   const [pos, setPos] = useState('ALL');
@@ -49,7 +49,7 @@ export default function Home() {
   return (
     <div className="page">
       <DateStrip days={days} value={selDay} onChange={setDay} />
-      <GamesSection games={dayGames} sport="nfl" spreadOf={spreadOf} onStandings={() => { window.location.hash = '/teams'; }} />
+      <GamesSection games={dayGames} sport={league} spreadOf={spreadOf} onStandings={() => { window.location.hash = `/${sportPath(league)}teams`; }} />
       <InjuriesSection sport="nfl" />
       <StreaksSection sport="nfl" />
       <HomeFeed sport="nfl" rail={false} />
@@ -173,6 +173,7 @@ export function TeamOutlookList({ teams }) {
 }
 
 function GameCard({ g, outlook }) {
+  const { sport: league } = useData();
   const { openTeam } = useUi();
   const h = outlook?.teams.find((t) => t.abbr === g.home.abbr);
   const a = outlook?.teams.find((t) => t.abbr === g.away.abbr);
@@ -215,7 +216,7 @@ function GameCard({ g, outlook }) {
         ) : null}
         {g.state === 'pre' && g.venue && <span className="venue">{g.venue}{g.city ? ` · ${g.city}` : ''}</span>}
       </footer>
-      <a className={`gc-link ${g.state}`} href={`#/game?id=${g.id}`}>
+      <a className={`gc-link ${g.state}`} href={`#/${sportPath(league)}game?id=${g.id}`}>
         {g.state === 'in' ? <><span className="live-dot" /> Live play-by-play</> : g.state === 'post' ? 'Recap & play-by-play' : 'Game preview'} →
       </a>
     </article>

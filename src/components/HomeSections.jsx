@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSnapshot } from '../api.js';
-import { useData } from '../data.jsx';
+import { sportPath, useData } from '../data.jsx';
 import { favoriteRank, useFavorites } from '../favorites.js';
 import { computeStreaks, injuryReport, topPerformers } from '../insights.js';
 import { addDays, etDate } from '../nba/api.js';
@@ -40,7 +40,8 @@ export function DateStrip({ days, value, onChange }) {
 export function useNflDays() {
   const { board } = useData();
   const [snap, setSnap] = useState(null);
-  useEffect(() => { getSnapshot().then(setSnap).catch(() => setSnap({ games: [] })); }, []);
+  const { api } = useData();
+  useEffect(() => { (api?.getSnapshot || getSnapshot)().then(setSnap).catch(() => setSnap({ games: [] })); }, [api]);
   return useMemo(() => {
     const byId = new Map(board.games.map((g) => [g.id, g]));
     const games = (snap?.games || board.games).map((g) => byId.get(g.id) || g);
@@ -81,10 +82,14 @@ export function useNbaDays() {
 /** Compact two-row game cards: badge, record, nickname, then time/TV/spread or score. */
 export function GamesSection({ games, sport, spreadOf, onStandings }) {
   const { teams } = useData();
-  const href = (id) => `#/${sport === 'nba' ? 'nba/' : ''}game?id=${id}`;
+  const href = (id) => `#/${sportPath(sport)}game?id=${id}`;
   const order = { in: 0, pre: 1, post: 2 };
   const [favs] = useFavorites(sport);
-  const list = [...games].sort((a, b) => order[a.state] - order[b.state] || favoriteRank(b, favs) - favoriteRank(a, favs) || new Date(a.date) - new Date(b.date));
+  const best = (g) => Math.min(g.rank?.home && g.rank.home <= 25 ? g.rank.home : 99, g.rank?.away && g.rank.away <= 25 ? g.rank.away : 99);
+  const [showAll, setShowAll] = useState(false);
+  const sorted = [...games].sort((a, b) => order[a.state] - order[b.state] || favoriteRank(b, favs) - favoriteRank(a, favs) || best(a) - best(b) || new Date(a.date) - new Date(b.date));
+  const CAP = 16;
+  const list = showAll ? sorted : sorted.slice(0, CAP);
   return (
     <section className="hs">
       <SectionHead title="Games" more="Standings" onMore={onStandings} />
@@ -100,7 +105,7 @@ export function GamesSection({ games, sport, spreadOf, onStandings }) {
                       <span className="gs-badge" style={{ '--tc': teams?.[t.abbr]?.color || 'var(--surface-3)' }}><TeamLogo abbr={t.abbr} size={30} /></span>
                       <span className="gs-rec">
                         <strong>{g.state === 'pre' ? t.record || '—' : t.score}</strong>
-                        <small>{g.state === 'pre' ? teams?.[t.abbr]?.short || t.abbr : t.record || teams?.[t.abbr]?.short}</small>
+                        <small>{(() => { const r = g.rank?.[t === g.home ? 'home' : 'away']; return r && r <= 25 ? <span className="gs-rank">#{r}</span> : null; })()}{g.state === 'pre' ? teams?.[t.abbr]?.short || t.abbr : t.record || teams?.[t.abbr]?.short}</small>
                       </span>
                     </span>
                   ))}
@@ -118,6 +123,7 @@ export function GamesSection({ games, sport, spreadOf, onStandings }) {
           })}
         </div>
       )}
+      {sorted.length > CAP && <button type="button" className="more-btn card" onClick={() => setShowAll((x) => !x)}>{showAll ? 'Show fewer games' : `Show all ${sorted.length} games`}</button>}
     </section>
   );
 }

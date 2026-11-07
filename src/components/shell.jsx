@@ -24,10 +24,19 @@ const TENNIS_NAV = [
   { path: 'rankings', label: 'Rankings', icon: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4' },
   { path: 'record', label: 'Model Record', short: 'Record', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
 ];
-const navFor = (sport) => (sport === 'nba' ? NBA_NAV : sport === 'tennis' ? TENNIS_NAV : NAV);
+const CFB_NAV = [
+  { path: 'home', label: 'This Week', short: 'Week', icon: 'M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10' },
+  { path: 'props', label: 'Props & Best Picks', short: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
+  { path: 'picks', label: 'Game Picks', short: 'Picks', icon: 'M4 6h11M4 12h8M4 18h11M18 5l3 3-3 3M18 13l3 3-3 3' },
+  { path: 'projections', label: 'Projections', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
+  { path: 'stats', label: 'Season Stats', short: 'Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
+  { path: 'teams', label: 'Teams', icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
+  { path: 'matchups', label: 'Matchups', menuOnly: true, icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
+];
+const navFor = (sport) => (sport === 'nba' ? NBA_NAV : sport === 'tennis' ? TENNIS_NAV : sport === 'cfb' ? CFB_NAV : NAV);
 const href = (sport, path) => `#/${sport === 'nfl' ? '' : `${sport}/`}${path}`;
-const SPORTS_LIST = ['nfl', 'nba', 'tennis'];
-const SPORT_NAME = { nfl: 'NFL', nba: 'NBA', tennis: 'Tennis' };
+const SPORTS_LIST = ['nfl', 'cfb', 'nba', 'tennis'];
+const SPORT_NAME = { nfl: 'NFL', cfb: 'CFB', nba: 'NBA', tennis: 'Tennis' };
 
 const NAV = [
   { path: 'home', label: 'This Week', short: 'Week', icon: 'M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10' },
@@ -239,7 +248,7 @@ const DOCK = ['home', 'props', 'parlays', 'scan', 'slips'];
 
 /** Floating rounded bottom bar with the main sections, plus a separate search button. */
 export function MobileNav({ route }) {
-  const items = route.sport === 'tennis' ? navFor('tennis') : navFor(route.sport).filter((n) => DOCK.includes(n.path)).sort((a, b) => DOCK.indexOf(a.path) - DOCK.indexOf(b.path));
+  const items = route.sport === 'tennis' ? navFor('tennis') : route.sport === 'cfb' ? navFor('cfb').filter((n) => !n.menuOnly && n.path !== 'teams') : navFor(route.sport).filter((n) => DOCK.includes(n.path)).sort((a, b) => DOCK.indexOf(a.path) - DOCK.indexOf(b.path));
   return (
     <div className="dock">
       <nav className="mobile-nav" aria-label="Primary mobile">
@@ -284,7 +293,7 @@ export function Ticker() {
   return (
     <div className="ticker" role="list" aria-label="Scores">
       {games.map((g) => (
-        <a key={g.id} role="listitem" href={`#/${sport === 'nba' ? 'nba/' : ''}game?id=${g.id}`} className={`tick ${g.state} ${g.redZone ? 'rz' : ''}`} title={`${g.away.abbr} @ ${g.home.abbr}: open Game Center`}>
+        <a key={g.id} role="listitem" href={`#/${sport && sport !== 'nfl' ? `${sport}/` : ''}game?id=${g.id}`} className={`tick ${g.state} ${g.redZone ? 'rz' : ''}`} title={`${g.away.abbr} @ ${g.home.abbr}: open Game Center`}>
           <div className="tick-head">
             <GameStatus g={g} />
             {g.tv && <span className="tv">{g.tv}</span>}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { saveSlip } from '../slips.js';
 
-const slipsHref = (sport) => `#/${sport === 'nba' ? 'nba/' : ''}slips`;
+const slipsHref = (sport) => `#/${sport && sport !== 'nfl' ? `${sport}/` : ''}slips`;
 
 /**
  * "Save slip" for any list of legs. Legs need: sport, playerId, player, market,

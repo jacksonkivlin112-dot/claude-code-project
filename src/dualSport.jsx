@@ -6,10 +6,11 @@ import { DataProvider } from './data.jsx';
 import { NbaDataProvider } from './nba/data.jsx';
 import { NBA_CFG, useNbaContext } from './nba/pages/Props.jsx';
 import { NFL_CFG, useNflContext } from './pages/Props.jsx';
+import { CFB_CFG } from './cfb/pages/Props.jsx';
 
-export const CFGS = { nfl: NFL_CFG, nba: NBA_CFG };
-export const SPORT_LABEL = { nfl: 'NFL', nba: 'NBA' };
-export const OWN_HOOK = { nfl: useNflContext, nba: useNbaContext };
+export const CFGS = { nfl: NFL_CFG, nba: NBA_CFG, cfb: CFB_CFG };
+export const SPORT_LABEL = { nfl: 'NFL', nba: 'NBA', cfb: 'CFB' };
+export const OWN_HOOK = { nfl: useNflContext, nba: useNbaContext, cfb: useNflContext };
 
 function Bridge({ use, onChange }) {
   const v = use();

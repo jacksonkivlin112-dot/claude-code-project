@@ -240,7 +240,9 @@ export async function getTeamSchedule(abbr) {
 }
 
 export const headshot = (p) =>
-  p.sport === 'nba'
+  p.sport === 'cfb'
+    ? `https://a.espncdn.com/i/headshots/college-football/players/full/${p.id}.png`
+    : p.sport === 'nba'
     ? `https://sleepercdn.com/content/nba/players/thumb/${p.id}.jpg`
     : p.pos === 'DEF'
     ? `https://sleepercdn.com/images/team_logos/nfl/${p.id.toLowerCase()}.png`

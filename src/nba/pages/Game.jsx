@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePlayerOpener } from '../../components/playerLink.js';
 import { useData } from '../../data.jsx';
 import { Avatar, Card, Empty, Segmented, SkeletonRows, TeamLogo, f1, kickoff, timeAgo, useNow, useUi } from '../../components/ui.jsx';
 import { getNbaSummary } from '../api.js';
@@ -208,13 +209,14 @@ function PlayByPlay({ game, color }) {
 
 function BoxScore({ game }) {
   const [team, setTeam] = useState(game.away.abbr);
+  const openPlayer = usePlayerOpener();
   const t = game.players.find((x) => x.abbr === team);
   if (!t) return <Card><Empty title="Box score not available yet" /></Card>;
   const starters = t.athletes.filter((a) => a.starter);
   const bench = t.athletes.filter((a) => !a.starter);
   const Rows = ({ list }) => list.map((a) => (
     <tr key={a.id || a.name} className={`static ${a.dnp ? 'dnp' : ''}`}>
-      <td><span className="cell-opp">{a.headshot && <img className="mini-head" src={a.headshot} alt="" loading="lazy" />}{a.short || a.name} <span className="muted small">{a.pos}</span></span></td>
+      <td><button type="button" className="cell-opp link-plain box-name" onClick={() => openPlayer(a.name, t.abbr)}>{a.headshot && <img className="mini-head" src={a.headshot} alt="" loading="lazy" />}{a.short || a.name} <span className="muted small">{a.pos}</span></button></td>
       {a.dnp ? <td colSpan={t.labels.length} className="muted small">{a.reason || 'Did not play'}</td> : a.stats.map((s, i) => <td key={i} className="num">{s}</td>)}
     </tr>
   ));

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import PlayerBio from '../components/PlayerBio.jsx';
 import { useData } from '../data.jsx';
 import { ordinal } from '../model.js';
 import { GameStatus } from '../components/shell.jsx';
@@ -112,6 +113,7 @@ export function NbaPlayerPanel({ id }) {
             {base.injury ? `${base.injury}${base.injuryPart ? ` · ${base.injuryPart}` : ''}` : 'Healthy'}
             {base.exp != null && <> · {base.exp === 0 ? 'Rookie' : `${ordinal(base.exp + 1)} season`}</>}
           </span>
+          <PlayerBio league="nba" name={base.name} />
         </div>
         <TeamLogo abbr={base.team} size={72} className="hero-watermark" />
       </div>

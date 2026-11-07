@@ -2287,3 +2287,78 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 .cfbp-meta b { color: var(--text-2); }
 .gs-rank { font-size: 11px; font-weight: 800; color: var(--accent); margin-right: 4px; }
 @media (max-width: 860px) { .cfbp-list { margin: 0 -16px; } .cfbp-row { padding: 12px 16px; } }
+
+/* Player sheet: season stats grid */
+.season-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ss-cell { display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.ss-cell small { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
+.ss-cell b { font-family: var(--font-display); font-size: 24px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ss-cell span { font-size: 12px; color: var(--text-2); font-weight: 600; }
+.panel-sec h3 .muted { font-weight: 600; margin-left: 6px; text-transform: none; letter-spacing: 0; }
+.lf-faces { cursor: pointer; }
+.box-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; text-align: left; }
+@media (max-width: 860px) { .season-stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* Player bio */
+.bio-btn { margin-top: 8px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(0, 0, 0, 0.3); color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.02em; backdrop-filter: blur(6px); }
+.t-panel-head .bio-btn { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
+.bio-sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); z-index: 70; background: var(--bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); animation: slideIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.bio-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.bio-head div { display: flex; flex-direction: column; min-width: 0; }
+.bio-head strong { font-size: 18px; }
+.bio-head small { color: var(--text-3); font-weight: 600; }
+.bio-back { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 26px; line-height: 1; padding-bottom: 3px; flex: none; }
+.bio-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px; display: flex; flex-direction: column; gap: 18px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); }
+.bio-body h3 { margin: 0 0 8px; font-size: 16px; }
+.bio-facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.bio-facts div { display: flex; flex-direction: column; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.bio-facts small { font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); }
+.bio-facts b { font-size: 16px; }
+.bio-note { padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+.bio-note p { margin: 0; color: var(--text-2); line-height: 1.5; font-size: 14px; }
+.bio-news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bio-news a { display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); color: var(--text); }
+.bio-news a:not(:has(img)) { grid-template-columns: 1fr; }
+.bio-news img { width: 72px; height: 48px; object-fit: cover; border-radius: 8px; }
+.bio-news span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bio-news b { font-size: 14px; line-height: 1.35; }
+.bio-news small { color: var(--text-3); font-size: 12px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+/* ===== Phone layout pass =================================================== */
+@media (max-width: 860px) {
+  /* Compact top: smaller league tabs, no score ticker (scores live on each league's home). */
+  .ticker { display: none; }
+  .topbar-inner { padding: 8px 14px 2px; }
+  .topbar-tools .icon-btn, .ai-hdr { height: 38px; }
+  .topbar-tools .icon-btn { width: 38px; }
+  .league-tabs { gap: 18px; padding: 0 16px 8px; }
+  .league-tabs a { font-size: 24px; }
+  .main { padding-top: 10px; }
+
+  /* Page titles: one or two lines, not three. */
+  h1 { font-size: 30px; line-height: 1; }
+  .hero, .page-head { padding: 16px 14px; gap: 10px; }
+  .page-head .eyebrow { margin-bottom: 4px; }
+  .page { gap: 16px; }
+
+  /* Headings with a side note: note drops below instead of squeezing the title. */
+  .section-head { flex-wrap: wrap; row-gap: 2px; }
+  .section-head h2 { white-space: nowrap; font-size: 21px; }
+  .section-head > .muted, .section-head > .small { flex-basis: 100%; }
+  .card-head { flex-wrap: wrap; padding: 14px 14px 0; }
+  .card-head button, .card-head .btn-ghost { white-space: nowrap; }
+
+  /* Tap targets and text. */
+  .btn, .btn-ghost { min-height: 40px; }
+  .seg button { padding: 7px 11px; }
+  .toolbar { gap: 8px; }
+  .toolbar select, .toolbar .search { min-height: 40px; }
+  .disclaimer { font-size: 11px; line-height: 1.5; }
+  .footer { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); font-size: 11px; }
+}
+@media (max-width: 380px) {
+  .league-tabs { gap: 14px; }
+  .league-tabs a { font-size: 21px; }
+  h1 { font-size: 26px; }
+  .ai-hdr { padding: 0 11px; }
+}

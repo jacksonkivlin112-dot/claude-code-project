@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePlayerOpener } from '../components/playerLink.js';
 import { getGameSummary } from '../api.js';
 import { sportPath, useData } from '../data.jsx';
 import { parseSummary } from '../gamecast.js';
@@ -338,6 +339,7 @@ const BOX_GROUPS = ['passing', 'rushing', 'receiving', 'defensive', 'interceptio
 
 function BoxScore({ game }) {
   const [team, setTeam] = useState(game.away.abbr);
+  const openPlayer = usePlayerOpener();
   const t = game.players.find((x) => x.abbr === team);
   return (
     <div className="box">
@@ -350,7 +352,7 @@ function BoxScore({ game }) {
               <tbody>
                 {g.athletes.map((a) => (
                   <tr key={a.id || a.name} className="static">
-                    <td><span className="cell-opp">{a.headshot && <img className="mini-head" src={a.headshot} alt="" loading="lazy" />}{a.name}</span></td>
+                    <td><button type="button" className="cell-opp link-plain box-name" onClick={() => openPlayer(a.name, t.abbr)}>{a.headshot && <img className="mini-head" src={a.headshot} alt="" loading="lazy" />}{a.name}</button></td>
                     {a.stats.map((s, i) => <td key={i} className="num">{s}</td>)}
                   </tr>
                 ))}

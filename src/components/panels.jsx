@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getTeamSchedule } from '../api.js';
+import PlayerBio from './PlayerBio.jsx';
 import { useData } from '../data.jsx';
 import { grade, ordinal, playerSummary, pts } from '../model.js';
 import { statLine } from '../pages/Projections.jsx';
@@ -45,7 +46,7 @@ export function Overlay({ PlayerPanelC = PlayerPanel, TeamPanelC = TeamPanel }) 
 }
 
 function PlayerPanel({ id }) {
-  const { season, fmt, teams, core, gameByTeam } = useData();
+  const { season, fmt, teams, core, gameByTeam, sport } = useData();
   const rows = useProjectionRows(core?.week);
   const r = rows?.find((x) => x.id === id);
   const sp = season.players.get(id);
@@ -70,6 +71,7 @@ function PlayerPanel({ id }) {
             {base.injury ? `${base.injury}${base.injuryPart ? ` · ${base.injuryPart}` : ''}` : 'Healthy'}
             {r?.exp != null && base.pos !== 'DEF' && <> · {r.exp === 0 ? 'Rookie' : `${ordinal(r.exp + 1)} season`}</>}
           </span>
+          {base.pos !== 'DEF' && <PlayerBio league={sport === 'cfb' ? 'cfb' : 'nfl'} name={base.name} espnId={sport === 'cfb' ? base.id : null} />}
         </div>
         <TeamLogo abbr={base.team} size={72} className="hero-watermark" />
       </div>
@@ -81,6 +83,8 @@ function PlayerPanel({ id }) {
           <Stat label="Last 3 avg" value={sum.games ? f1(sum.last3) : '—'} sub={sum.games >= 3 ? (sum.last3 >= sum.ppg ? 'Trending up' : 'Trending down') : ''} />
           <Stat label="Best game" value={sum.games ? f1(sum.best) : '—'} sub={sum.games ? `Wk ${sum.weekly.find((w) => w.pts === sum.best)?.week}` : ''} />
         </div>
+
+        {sum.games > 0 && <SeasonStats pos={base.pos} weekly={sum.weekly} />}
 
         {r && (
           <section className="panel-sec">
@@ -152,6 +156,53 @@ function PlayerPanel({ id }) {
   );
 }
 
+const SEASON_STATS = {
+  QB: [['pass_yd', 'Pass yds'], ['pass_td', 'Pass TD'], ['pass_int', 'INT'], ['cmp_pct', 'Comp %'], ['pass_att', 'Attempts'], ['rush_yd', 'Rush yds'], ['rush_td', 'Rush TD'], ['ypa', 'Yds/att']],
+  RB: [['rush_yd', 'Rush yds'], ['rush_att', 'Carries'], ['ypc', 'Yds/carry'], ['rush_td', 'Rush TD'], ['rec', 'Receptions'], ['rec_yd', 'Rec yds'], ['rec_td', 'Rec TD'], ['scrim', 'Scrimmage yds']],
+  WR: [['rec', 'Receptions'], ['rec_yd', 'Rec yds'], ['rec_td', 'Rec TD'], ['ypr', 'Yds/catch'], ['rec_tgt', 'Targets'], ['catch_pct', 'Catch %'], ['rush_yd', 'Rush yds'], ['long_gm', 'Best game yds']],
+  K: [['fgm', 'FG made'], ['fga', 'FG att'], ['xpm', 'XP made']],
+  DEF: [['sack', 'Sacks'], ['int', 'INT'], ['fum_rec', 'Fumble rec'], ['def_td', 'Def TD'], ['pts_allow', 'Pts allowed']],
+};
+SEASON_STATS.TE = SEASON_STATS.WR;
+
+/** Season totals and per-game averages for the player's position. */
+function SeasonStats({ pos, weekly }) {
+  const keys = SEASON_STATS[pos] || SEASON_STATS.WR;
+  const tot = {};
+  for (const w of weekly) for (const [k, v] of Object.entries(w.s || {})) tot[k] = (tot[k] || 0) + (Number(v) || 0);
+  const g = weekly.length;
+  const derived = {
+    cmp_pct: tot.pass_att ? (tot.pass_cmp / tot.pass_att) * 100 : null,
+    ypa: tot.pass_att ? tot.pass_yd / tot.pass_att : null,
+    ypc: tot.rush_att ? tot.rush_yd / tot.rush_att : null,
+    ypr: tot.rec ? tot.rec_yd / tot.rec : null,
+    catch_pct: tot.rec_tgt ? (tot.rec / tot.rec_tgt) * 100 : null,
+    scrim: (tot.rush_yd || 0) + (tot.rec_yd || 0),
+    long_gm: Math.max(0, ...weekly.map((w) => (w.s?.rec_yd || 0) + (pos === 'RB' ? w.s?.rush_yd || 0 : 0))),
+  };
+  const rate = new Set(['cmp_pct', 'ypa', 'ypc', 'ypr', 'catch_pct', 'long_gm']);
+  const items = keys.map(([k, label]) => {
+    const v = k in derived ? derived[k] : tot[k];
+    if (v == null || (k === 'rec_tgt' && !v)) return null;
+    const pct = k.endsWith('_pct');
+    return { k, label, value: rate.has(k) ? `${f1(v)}${pct ? '%' : ''}` : f0(v), per: rate.has(k) ? null : f1(v / g) };
+  }).filter(Boolean);
+  return (
+    <section className="panel-sec">
+      <h3>Season stats <span className="muted small">{g} game{g === 1 ? '' : 's'}</span></h3>
+      <div className="season-stats">
+        {items.map((x) => (
+          <div key={x.k} className="ss-cell">
+            <small>{x.label}</small>
+            <b>{x.value}</b>
+            {x.per != null && <span>{x.per} / game</span>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function logLine(pos, s) {
   const n = (k) => f0(s[k] || 0);
   switch (pos) {
@@ -161,7 +212,7 @@ function logLine(pos, s) {
       return `${n('rush_att')}-${n('rush_yd')}, ${n('rush_td')} TD · ${n('rec')}-${n('rec_yd')} rec${s.rec_td ? `, ${n('rec_td')} TD` : ''}`;
     case 'WR':
     case 'TE':
-      return `${n('rec')}/${n('rec_tgt')}, ${n('rec_yd')} yds${s.rec_td ? `, ${n('rec_td')} TD` : ''}${s.off_snp && s.tm_off_snp ? ` · ${Math.round((s.off_snp / s.tm_off_snp) * 100)}% snaps` : ''}`;
+      return `${s.rec_tgt ? `${n('rec')}/${n('rec_tgt')}` : `${n('rec')} rec`}, ${n('rec_yd')} yds${s.rec_td ? `, ${n('rec_td')} TD` : ''}${s.off_snp && s.tm_off_snp ? ` · ${Math.round((s.off_snp / s.tm_off_snp) * 100)}% snaps` : ''}`;
     case 'K':
       return `${n('fgm')}/${n('fga')} FG, ${n('xpm')} XP`;
     case 'DEF':

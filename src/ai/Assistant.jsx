@@ -4,6 +4,8 @@ import { DataProvider, useData } from '../data.jsx';
 import { NbaDataProvider } from '../nba/data.jsx';
 import { NBA_CFG, useNbaContext } from '../nba/pages/Props.jsx';
 import { NFL_CFG, useNflContext, usePropLines } from '../pages/Props.jsx';
+import * as CFB_API from '../cfb/api.js';
+import { CFB_CFG } from '../cfb/pages/Props.jsx';
 import { TOOLS, runTool, toolLabel } from './tools.js';
 
 const KEY = 'ge:ai:key';
@@ -21,7 +23,7 @@ const SYSTEM = `You are the AI assistant inside Gridiron Edge, a sports app for 
 
 How to work:
 - Use the tools for every fact: games, scores, player stats, projections, prop lines and model chances. Never invent a line, stat, injury or score. If a tool returns an error or nothing, say so plainly.
-- NFL and NBA tools take a sport parameter; tennis tools take a tour (atp or wta). The user's message starts with the app context (date, which tab they are on); use it to resolve "today", "tonight", "this week" and to pick the sport when they don't name one.
+- NFL, college football (cfb, FBS) and NBA tools take a sport parameter (college football has no sportsbook player props in the data, so use evaluate_prop with the user's line and get_highest_chance_picks); tennis tools take a tour (atp or wta). The user's message starts with the app context (date, which tab they are on); use it to resolve "today", "tonight", "this week" and to pick the sport when they don't name one.
 - For a prop question, call evaluate_prop with the exact line. For "best picks" or parlays, prefer get_highest_chance_picks (calibrated, has held up in testing) and get_prop_lines. Combine several tool calls in one turn when they are independent.
 
 Be honest about the model:
@@ -34,10 +36,10 @@ Style: the user is usually on a phone. Lead with the answer in a sentence or two
 
 /** Mounts a league's data and keeps the latest values in a ref for the tools. */
 function Bridge({ sport, sink, onReady }) {
-  const own = sport === 'nfl' ? useNflContext() : useNbaContext();
+  const own = sport === 'nba' ? useNbaContext() : useNflContext(); // eslint-disable-line react-hooks/rules-of-hooks
   const data = useData();
   const P = usePropLines(sport);
-  sink.current[sport] = { cfg: sport === 'nfl' ? NFL_CFG : NBA_CFG, ctx: own.ctx, rows: own.rows, data, lines: P.lines };
+  sink.current[sport] = { cfg: sport === 'nba' ? NBA_CFG : sport === 'cfb' ? CFB_CFG : NFL_CFG, ctx: own.ctx, rows: own.rows, data, lines: P.lines };
   useEffect(() => { if (own.ctx) onReady(sport); }, [!!own.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
@@ -68,6 +70,7 @@ function Md({ text }) {
 const SUGGEST = {
   nfl: ['Who has the best matchups this week?', 'Build me a safe 3-leg NFL parlay', 'Is Bijan Robinson over 85.5 rush + rec yards a good pick?', 'How is the model doing on real lines?'],
   nba: ['What are the highest-chance NBA props tonight?', 'Should I take Jokic over 11.5 rebounds?', 'Build a 3-leg parlay from tonight’s games', 'How are my saved slips doing?'],
+  cfb: ['What are the best college football props this week?', 'Build a safe 3-leg CFB parlay', 'How many passing yards will Arch Manning throw?', 'What’s happening in the biggest college game right now?'],
   tennis: ['Who are the safest tennis picks today?', 'Preview the biggest ATP match today', 'How has the tennis model done?', 'Give me a 3-leg tennis parlay'],
 };
 
@@ -102,7 +105,7 @@ export default function Assistant({ sport, onClose }) {
     setInput('');
     setBusy(true);
     setItems((xs) => [...xs, { role: 'user', text: q }, { role: 'assistant', text: '', tools: [], thinking: true }]);
-    const context = `[App context: today is ${new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, local time ${new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}; the user is on the ${sport === 'tennis' ? 'Tennis' : sport.toUpperCase()} tab.]`;
+    const context = `[App context: today is ${new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, local time ${new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}; the user is on the ${sport === 'tennis' ? 'Tennis' : sport === 'cfb' ? 'college football (CFB)' : sport.toUpperCase()} tab.]`;
     msgs.current.push({ role: 'user', content: `${context}\n\n${q}` });
     const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
     const canFallback = model !== 'claude-haiku-5-5';
@@ -173,6 +176,7 @@ export default function Assistant({ sport, onClose }) {
     <div className="ai-sheet" role="dialog" aria-modal="true" aria-label="AI assistant" onClick={onClose}>
       <NbaDataProvider><Bridge sport="nba" sink={sink} onReady={(s) => setReady((r) => ({ ...r, [s]: true }))} /></NbaDataProvider>
       <DataProvider><Bridge sport="nfl" sink={sink} onReady={(s) => setReady((r) => ({ ...r, [s]: true }))} /></DataProvider>
+      <DataProvider api={CFB_API} sport="cfb"><Bridge sport="cfb" sink={sink} onReady={(s) => setReady((r) => ({ ...r, [s]: true }))} /></DataProvider>
       <div className="ai-panel" onClick={(e) => e.stopPropagation()}>
         <header className="ai-head">
           <span className="ai-title"><span className="ai-spark" aria-hidden>✦</span> Edge AI <small>{MODELS.find((m) => m.id === model)?.label}</small></span>

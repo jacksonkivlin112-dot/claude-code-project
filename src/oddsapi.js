@@ -50,6 +50,7 @@ export const MARKETS_NBA = {
 export const SPORTS = {
   nfl: { key: 'americanfootball_nfl', markets: MARKETS, label: 'NFL' },
   nba: { key: 'basketball_nba', markets: MARKETS_NBA, label: 'NBA' },
+  cfb: { key: 'americanfootball_ncaaf', markets: MARKETS, label: 'CFB' },
 };
 
 export function normName(n = '') {

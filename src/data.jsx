@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { getProjections, getScoreboard, getStandings, getState, getTeams, getWeekStats } from './api.js';
+import * as NFL_API from './api.js';
 import { buildSeason, rankDvp } from './model.js';
 
 export const DataCtx = createContext(null);
+/** URL prefix for a league's routes: '' for NFL, 'nba/', 'cfb/', 'tennis/'. */
+export const sportPath = (s) => (s && s !== 'nfl' ? `${s}/` : '');
 export const useData = () => useContext(DataCtx);
 
 const LIVE_POLL_MS = 60 * 1000;
@@ -20,7 +22,12 @@ function writePref(key, v) {
   } catch { /* ignore */ }
 }
 
-export function DataProvider({ children }) {
+/**
+ * NFL-shaped data layer. `api` supplies the feeds (NFL by default; college football passes its own
+ * with the same functions and row shapes), so every NFL screen works for either league.
+ */
+export function DataProvider({ children, api = NFL_API, sport = 'nfl' }) {
+  const { getProjections, getScoreboard, getStandings, getState, getTeams, getWeekStats } = api;
   const [core, setCore] = useState(null); // { season, week, seasonType }
   const [teams, setTeams] = useState(null);
   const [standings, setStandings] = useState([]);
@@ -46,7 +53,8 @@ export function DataProvider({ children }) {
       const season = Number(state.season);
       const regular = state.season_type === 'regular';
       // Pre-season: show week 1. Post/off-season: show the final regular-season week.
-      const week = regular ? Math.min(Math.max(Number(state.week) || 1, 1), 18) : state.season_type === 'pre' ? 1 : 18;
+      const maxWeek = api.MAX_WEEK || 18;
+      const week = regular ? Math.min(Math.max(Number(state.week) || 1, 1), maxWeek) : state.season_type === 'pre' ? 1 : maxWeek;
       const c = { season, week, seasonType: state.season_type };
       setCore(c);
 
@@ -133,6 +141,7 @@ export function DataProvider({ children }) {
   }, [board]);
 
   const value = {
+    sport, api,
     core, teams, standings, board, proj, season, ranks, fmt, setFmt,
     liveById, gameByTeam, loading, progress, error, updatedAt, reload: load, loadProjections, anyLive,
   };
@@ -145,7 +154,7 @@ export function useRoute() {
     const h = window.location.hash.replace(/^#\/?/, '');
     const [rawPath, qs] = h.split('?');
     const parts = (rawPath || '').split('/').filter(Boolean);
-    const sport = parts[0] === 'nba' || parts[0] === 'tennis' ? parts[0] : 'nfl';
+    const sport = ['nba', 'tennis', 'cfb'].includes(parts[0]) ? parts[0] : 'nfl';
     if (sport !== 'nfl') parts.shift();
     return { sport, path: parts[0] || 'home', params: new URLSearchParams(qs || '') };
   };

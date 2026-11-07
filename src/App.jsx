@@ -18,6 +18,9 @@ import Teams from './pages/Teams.jsx';
 import { NbaPlayerPanel, NbaTeamPanel } from './nba/components.jsx';
 import { NbaDataProvider } from './nba/data.jsx';
 import { TennisDataProvider } from './tennis/data.jsx';
+import * as CFB_API from './cfb/api.js';
+import CfbProps from './cfb/pages/Props.jsx';
+import CfbPicks from './cfb/pages/Picks.jsx';
 import { TennisPlayerPanel } from './tennis/components.jsx';
 import TennisHome from './tennis/pages/Home.jsx';
 import TennisMatch from './tennis/pages/Match.jsx';
@@ -48,6 +51,13 @@ const SPORTS = {
     panels: { PlayerPanelC: NbaPlayerPanel, TeamPanelC: NbaTeamPanel },
     credit: 'Box scores & projections via Sleeper · Scores, standings & logos via ESPN',
     footer: (core) => (core ? `${core.label} season · data refreshes automatically every night` : ''),
+  },
+  cfb: {
+    Provider: ({ children }) => <DataProvider api={CFB_API} sport="cfb">{children}</DataProvider>,
+    pages: { home: Home, game: Game, projections: Projections, props: CfbProps, picks: CfbPicks, stats: Stats, teams: Teams, matchups: Matchups },
+    panels: {},
+    credit: 'Scores, box scores, rankings & lines via ESPN · Projections & ratings built from every FBS game',
+    footer: (core) => (core ? `${core.season} season · data refreshes several times every Saturday` : ''),
   },
   tennis: {
     Provider: TennisDataProvider,

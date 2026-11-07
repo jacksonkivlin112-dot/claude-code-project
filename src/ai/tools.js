@@ -13,7 +13,7 @@ import { matchModel } from '../tennis/data.jsx';
 
 const r1 = (v) => (v == null || Number.isNaN(v) ? null : Math.round(v * 10) / 10);
 const pct = (p) => (p == null ? null : Math.round(p * 1000) / 10);
-const SPORT = { type: 'string', enum: ['nfl', 'nba'], description: 'League: nfl or nba.' };
+const SPORT = { type: 'string', enum: ['nfl', 'cfb', 'nba'], description: 'League: nfl, cfb (college football, FBS) or nba.' };
 
 export const TOOLS = [
   {
@@ -144,7 +144,7 @@ export async function runTool(name, input, sports) {
       const games = S.data.board?.games || [];
       const t = input.team?.toUpperCase();
       return {
-        label: input.sport === 'nfl' ? `Week ${S.data.core?.week}` : `Slate ${S.data.date}`,
+        label: input.sport === 'nba' ? `Slate ${S.data.date}` : `Week ${S.data.core?.week}`,
         games: games.filter((g) => !t || g.home.abbr === t || g.away.abbr === t).map((g) => ({
           id: g.id, away: g.away.abbr, home: g.home.abbr, state: g.state, detail: g.detail, start: g.date,
           score: g.state === 'pre' ? null : `${g.away.abbr} ${g.away.score} - ${g.home.abbr} ${g.home.score}`,
@@ -155,7 +155,7 @@ export async function runTool(name, input, sports) {
     case 'get_player': {
       const r = findRow(S.rows, input.name);
       const sp = r ? S.ctx.season?.players?.get(r.id) : [...(S.ctx.season?.players?.values() || [])].find((p) => normName(p.name).includes(normName(input.name)));
-      if (!r && !sp) return { error: `No player matching "${input.name}" on this ${input.sport === 'nfl' ? 'week' : 'slate'}.` };
+      if (!r && !sp) return { error: `No player matching "${input.name}" on this ${input.sport === 'nba' ? 'slate' : 'week'}.` };
       const log = (sp?.log || []).slice(-6).reverse();
       return {
         name: r?.name || sp?.name, team: r?.team || sp?.team, pos: r?.pos || sp?.pos, opp: r?.opp || null, injury: r?.injury || sp?.injury || null,
@@ -187,16 +187,17 @@ export async function runTool(name, input, sports) {
     }
     case 'get_live_game': {
       const g = S.ctx.gameByTeam?.[input.team.toUpperCase()];
-      if (!g) return { error: `No ${input.sport.toUpperCase()} game for ${input.team} on this ${input.sport === 'nfl' ? 'week' : 'slate'}.` };
+      if (!g) return { error: `No ${input.sport.toUpperCase()} game for ${input.team} on this ${input.sport === 'nba' ? 'slate' : 'week'}.` };
       if (g.state === 'pre') return { status: 'not started', start: g.date, away: g.away.abbr, home: g.home.abbr };
-      const raw = input.sport === 'nfl' ? await getGameSummary(g.id) : await getNbaSummary(g.id);
-      const game = input.sport === 'nfl' ? parseSummary(raw) : parseNbaSummary(raw);
-      const { items } = buildFeed(game, raw, input.sport);
+      const football = input.sport !== 'nba';
+      const raw = football ? await (S.data.api?.getGameSummary || getGameSummary)(g.id) : await getNbaSummary(g.id);
+      const game = football ? parseSummary(raw) : parseNbaSummary(raw);
+      const { items } = buildFeed(game, raw, football ? 'nfl' : 'nba');
       const lines = new Map();
       for (const i of items) for (const a of i.after || []) if (!lines.has(a.name)) lines.set(a.name, a.line);
       return {
         score: `${game.away.abbr} ${game.away.score} - ${game.home.abbr} ${game.home.score}`, status: g.detail || game.state,
-        last_plays: items.slice(0, 10).map((i) => `${i.clock ? `Q${i.period} ${i.clock} · ` : ''}${summarize(i, input.sport)}`),
+        last_plays: items.slice(0, 10).map((i) => `${i.clock ? `Q${i.period} ${i.clock} · ` : ''}${summarize(i, football ? 'nfl' : 'nba')}`),
         player_lines: Object.fromEntries([...lines.entries()].slice(0, 16)),
       };
     }

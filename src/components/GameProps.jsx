@@ -96,7 +96,7 @@ export default function GameProps({ game, sport }) {
             <ol className="gp-list">
               {safe.map((p) => <Row key={p.key} sport={sport} p={p} st={liveSt(p.actual ?? liveOf(p.playerId, p.market), p.line, 'over', game, frac)} />)}
             </ol>
-            {game.state === 'pre' && safe.length >= 2 && (
+            {game.state === 'pre' && safe.length >= 2 && sport !== 'cfb' && (
               <div className="gp-save"><SaveSlipButton legs={safe.slice(0, 3)} title={`${game.away.abbr} @ ${game.home.abbr} · top ${Math.min(3, safe.length)}`} source="game" /></div>
             )}
           </>

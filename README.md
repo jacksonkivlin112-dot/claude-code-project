@@ -86,3 +86,10 @@ Data: Sleeper NBA season totals, per-game box scores and per-game projections, p
 - Static site, no backend: the browser calls the Anthropic API directly with the user's own API key, stored only in that browser's localStorage. The SDK loads only when the assistant opens.
 - Tools (`src/ai/tools.js`) read the app's live data and models: games, players, prop model (`evaluate_prop`), posted lines, highest-chance picks, live play-by-play, saved slips, pick record, tennis matches/players.
 - Streaming, prompt caching on the system prompt + tools, server-side refusal fallback (`fallbacks: "default"`), effort `medium`.
+
+## College football (`#/cfb/...`)
+
+- **Data**: `scripts/fetch-espn-cfb.mjs` builds FBS player box scores for every game (ESPN summaries, incremental), roster positions, weekly projections (recent + season form × opponent defense × DraftKings-implied team total), team ratings and the backtests. Output in `public/data/cfb/`, NFL row shapes.
+- **Reuse**: `DataProvider` takes an `api` source; `src/cfb/api.js` implements the same functions as the NFL feed, so Home, Game Center (live play-by-play), Projections, Stats, Teams, Matchups and Props run on college data.
+- **Props & best picks**: no free feed carries college player props, so Props shows the model's calibrated highest-chance lines plus "type any line" for every player.
+- **Game picks**: team ratings (warmed up on last season) pick winners at ~70% out of sample; against the spread and totals they don't beat the line, so the page shows those for information only.

@@ -10,6 +10,8 @@ on:
   schedule:
     - cron: '17 9 * * *'        # daily
     - cron: '41 11-20/3 * * *'  # tennis (European/US daytime)
+    - cron: '12,42 16-23 * * 6'  # college football Saturdays (UTC)
+    - cron: '12,42 0-5 * * 0'    # late Saturday games (US night)
     - cron: '7,37 17-23 * * 0'  # Sunday game window (UTC), every 30 min
     - cron: '7 0-5 * * 1'       # Sunday night / early Monday
     - cron: '7 0-4 * * 2,5'     # Monday & Thursday night games
@@ -39,6 +41,8 @@ jobs:
         run: npm run data
       - name: Refresh NBA ESPN snapshot
         run: npm run data:nba
+      - name: Refresh college football box scores, projections and ratings
+        run: npm run data:cfb
       - name: Refresh tennis scores, rankings and ratings
         run: npm run data:tennis
       - name: Refresh sportsbook prop lines (DraftKings via ESPN, free)

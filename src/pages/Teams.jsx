@@ -4,7 +4,7 @@ import { useTeamOutlook } from '../components/players.jsx';
 import { Card, Empty, Meter, Segmented, SkeletonRows, TeamLogo, f1, pct, useUi } from '../components/ui.jsx';
 
 export default function Teams() {
-  const { core, standings } = useData();
+  const { core, standings, sport } = useData();
   const outlook = useTeamOutlook();
   const { openTeam } = useUi();
   const [conf, setConf] = useState('AFC');
@@ -28,7 +28,7 @@ export default function Teams() {
           <p className="eyebrow">Team outlook</p>
           <h1>Week {core?.week} Team Rankings</h1>
           <p className="hero-sub">
-            Projected points blend Sleeper’s implied team totals (65%) with a ratings model built from points scored and allowed per game (35%), with home field included. The outlook score ranks projected points and fantasy volume.
+            Projected points blend {sport === 'cfb' ? 'DraftKings-implied team totals' : 'Sleeper’s implied team totals'} (65%) with a ratings model built from points scored and allowed per game (35%), with home field included. The outlook score ranks projected points and fantasy volume.
           </p>
         </div>
       </div>

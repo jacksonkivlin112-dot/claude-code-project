@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { useData } from '../data.jsx';
+import { sportPath, useData } from '../data.jsx';
 import { favoriteRank, useFavorites } from '../favorites.js';
 import { TeamLogo, useUi } from './ui.jsx';
 
@@ -19,7 +19,7 @@ export function useSwipeGames(currentId, sport) {
   const go = (dir) => {
     const i = games.findIndex((g) => g.id === currentId);
     const next = games[i + dir];
-    if (i >= 0 && next) window.location.hash = `/${sport === 'nba' ? 'nba/' : ''}game?id=${next.id}`;
+    if (i >= 0 && next) window.location.hash = `/${sportPath(sport)}game?id=${next.id}`;
   };
   return {
     onTouchStart: (e) => {
@@ -41,7 +41,7 @@ export function useSwipeGames(currentId, sport) {
 
 export function GameSwitcher({ currentId, sport, back }) {
   const games = useSlate(sport);
-  const href = (id) => `#/${sport === 'nba' ? 'nba/' : ''}game?id=${id}`;
+  const href = (id) => `#/${sportPath(sport)}game?id=${id}`;
   return (
     <div className="gsw">
       <a className="gsw-back" href={back} aria-label="Back">‹</a>

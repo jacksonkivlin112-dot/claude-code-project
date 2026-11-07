@@ -14,6 +14,7 @@
     "lines": "node scripts/fetch-espn-lines.mjs nfl",
     "lines:nba": "node scripts/fetch-espn-lines.mjs nba",
     "data:tennis": "node scripts/fetch-espn-tennis.mjs",
+    "data:cfb": "node scripts/fetch-espn-cfb.mjs",
     "calibrate": "node scripts/calibrate-lines.mjs nfl && node scripts/calibrate-lines.mjs nba"
   },
   "dependencies": {

@@ -130,6 +130,8 @@ export function parseEvent(e, normTeam = normFor('nfl'), week) {
             return top ? [{ label: normTeam(k.team.abbreviation), name: top.athlete?.shortName, line: `${top.displayValue} ${l.shortDisplayName || ''}`.trim() }] : [];
           }),
       liveHomeWp: c.situation?.lastPlay?.probability?.homeWinPercentage ?? null,
+      line: c.odds?.[0] ? { details: c.odds[0].details || null, overUnder: c.odds[0].overUnder ?? null, spread: c.odds[0].spread ?? null } : null,
+      rank: { home: c.competitors.find((k) => k.homeAway === 'home')?.curatedRank?.current ?? null, away: c.competitors.find((k) => k.homeAway === 'away')?.curatedRank?.current ?? null },
     };
   }
 }

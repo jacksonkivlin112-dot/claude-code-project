@@ -93,7 +93,7 @@ export function GamesSection({ games, sport, spreadOf, onStandings }) {
           {list.map((g) => {
             const spread = spreadOf?.(g);
             return (
-              <a key={g.id} href={href(g.id)} className={`gs-card ${g.state} ${favoriteRank(g, favs) ? 'fav' : ''}`}>
+              <a key={g.id} href={href(g.id)} className={`gs-card ${g.state} ${favoriteRank(g, favs) ? 'fav' : ''}`} style={{ '--ac': teams?.[g.away.abbr]?.color || '#475569', '--hc': teams?.[g.home.abbr]?.color || '#475569' }}>
                 <span className="gs-teams">
                   {[g.away, g.home].map((t) => (
                     <span key={t.abbr} className={`gs-team ${g.state === 'post' && !t.winner ? 'lost' : ''}`}>

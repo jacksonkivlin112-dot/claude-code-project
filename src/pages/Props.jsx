@@ -359,7 +359,7 @@ function LineCalNote({ cal, none }) {
   return (
     <div className={`calnote ${none ? 'empty' : ''}`}>
       <strong>{none ? 'No edges against the sportsbook right now' : 'Calibrated to the line'}</strong>
-      <span>
+      <span className="fold">
         {cal.usingDefault
           ? `Sportsbook lines are sharp, so the app trusts only ${pct(cal.s)} of the model’s lean until at least 300 graded ${cfg.sport.toUpperCase()} lines show it beats the line (${cal.n} graded so far).`
           : `Checked on ${cal.n.toLocaleString()} graded ${cfg.sport.toUpperCase()} lines: when the model was 70%+ sure, its side hit ${cal.modelSide70 ? pct(cal.modelSide70.hit) : '—'}. So the app trusts ${pct(cal.s)} of its lean${cal.b ? ` and adjusts for overs hitting ${pct(cal.overRate)}` : ''}.`}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useData } from '../data.jsx';
 import { useUi } from '../components/ui.jsx';
+import PlayerBio from '../components/PlayerBio.jsx';
 import { TOURS, flagUrl, headshot, matchModel } from './data.jsx';
 
 const initials = (name = '') => name.split(' ').map((w) => w[0]).slice(0, 2).join('');
@@ -96,6 +97,7 @@ export function TennisPlayerPanel({ id }) {
         <div>
           <h2>{p.name}</h2>
           <p className="muted">{p.rank ? `World #${p.rank} · ${p.points?.toLocaleString()} pts` : 'Unranked'} · Elo {p.elo}</p>
+          <PlayerBio league={d.tour} name={p.name} espnId={p.id} />
         </div>
       </div>
       <PlayerStats p={p} />

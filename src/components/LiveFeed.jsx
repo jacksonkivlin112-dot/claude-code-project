@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { summarize } from '../liveFeed.js';
 import { Segmented, TeamLogo } from './ui.jsx';
+import { usePlayerOpener } from './playerLink.js';
 
 export const Q = (p) => (p <= 4 ? `Q${p}` : p === 5 ? 'OT' : `${p - 4}OT`);
 const PAGE = 40;
@@ -36,10 +37,12 @@ export function PlayCard({ item: i, game, color, sport, fresh, open, onToggle, g
   const extraTags = i.tags.slice(i.big ? 1 : 0).filter((t) => t.label !== 'MOMENTUM' && t.label !== 'FLAG');
   const oc = outcome(i, sport);
   const label = i.big && i.tags[0] ? i.tags[0] : null;
+  const openPlayer = usePlayerOpener();
+  const tapPlayer = (e) => { if (lead && openPlayer(lead.name, i.team)) e.stopPropagation(); };
   return (
     <article className={`lf-card ${i.big ? 'big' : ''} ${fresh ? 'new' : ''}`} style={{ '--tc': tc }}>
       <button type="button" className="lf-row" onClick={onToggle} aria-expanded={open}>
-        <span className="lf-faces">
+        <span className="lf-faces" onClick={tapPlayer} title={lead ? `${lead.name}: season stats` : undefined}>
           {lead ? <Headshot a={lead} size={58} ring={tc} /> : <span className="lf-teamface">{i.team ? <TeamLogo abbr={i.team} size={40} /> : <span className="lf-glyph" aria-hidden>{sport === 'nba' ? '◷' : '⚑'}</span>}</span>}
           {lead && i.team && <span className="lf-tbadge"><TeamLogo abbr={i.team} size={18} /></span>}
           {oc && <span className={`lf-oc ${oc.cls}`}>{oc.sym}</span>}

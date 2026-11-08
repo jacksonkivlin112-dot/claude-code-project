@@ -44,7 +44,7 @@ async function preprocess(file) {
   return { canvas: c, url: img.src };
 }
 
-async function runOcr(file, onProgress) {
+export async function runOcr(file, onProgress) {
   const { canvas } = await preprocess(file);
   const { createWorker } = await import('tesseract.js');
   const worker = await createWorker('eng', 1, {

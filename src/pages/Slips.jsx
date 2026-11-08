@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { runOcr } from './Scan.jsx';
-import { parseSlipText } from '../slipParse.js';
+import { parseSlipText, repairLine } from '../slipParse.js';
 import { buildRoster, nextGame } from '../slipRoster.js';
 import { normName } from '../oddsapi.js';
 import { CFGS, OWN_HOOK, SPORT_LABEL, useDualSports } from '../dualSport.jsx';
@@ -171,15 +171,43 @@ function SlipCard({ v }) {
 function UploadSlip({ sports }) {
   const inputRef = useRef();
   const [status, setStatus] = useState(null); // {phase, progress, done, ok}
-  const [legs, setLegs] = useState(null);
+  const [drafts, setDrafts] = useState(null); // what was read, editable
   const [preview, setPreview] = useState(null);
   const ready = !!sports.nfl.ctx || !!sports.nba.ctx;
 
   const roster = useMemo(() => buildRoster(sports), [sports.nfl.rows, sports.nba.rows, sports.nfl.ctx, sports.nba.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
   const bySport = (sp) => sports[sp];
 
+  const rosterOf = (sp, name) => roster.find((x) => x.sport === sp && normName(x.name) === normName(name));
+  const expectFor = (sp, name, market) => { const r = rosterOf(sp, name); const M = CFGS[sp]?.markets[market]; return r?.s && M ? M.get(r.s) : null; };
+  // When the stat couldn't be read, suggest the stat whose usual value best fits the line.
+  const COMMON = {
+    nba: ['player_points', 'player_rebounds', 'player_assists', 'player_threes', 'player_points_rebounds_assists', 'player_points_rebounds', 'player_points_assists', 'player_rebounds_assists'],
+    nfl: ['player_pass_yds', 'player_rush_yds', 'player_reception_yds', 'player_receptions', 'player_rush_reception_yds', 'player_pass_completions', 'player_rush_attempts'],
+  };
+  const guessMarket = (sp, name, line) => {
+    let best = null;
+    for (const m of COMMON[sp] || []) {
+      const ex = expectFor(sp, name, m);
+      if (!(ex > 0)) continue;
+      const sc = Math.abs(Math.log(line / ex));
+      if (!best || sc < best.sc) best = { m, sc };
+    }
+    return best && best.sc < 0.5 ? best.m : null;
+  };
+  const prepare = (found) => found.map((l) => {
+    const sp = l.sport || roster.find((r) => normName(r.name) === normName(l.player))?.sport;
+    if (!l.market && sp && l.line != null) {
+      const g = guessMarket(sp, l.player, Number(l.line) % 1 ? Number(l.line) : Number(l.line) + 0.5);
+      // With the stat known, the decimal repair can run (24 -> 24.5).
+      if (g) return { ...l, sport: sp, market: g, guessed: true, line: Number(l.line) % 1 ? Number(l.line) : repairLine(Number(l.line), false, g, rosterOf(sp, l.player)) };
+    }
+    return { ...l, sport: sp };
+  });
+  const legs = useMemo(() => (drafts ? resolve(drafts) : null), [drafts, sports]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Turn parsed legs into trackable legs using each league's model (player id, team, game time, chance).
-  const resolve = (found) => found.map((l, i) => {
+  function resolve(found) { return found.map((l, i) => {
     const sp = l.sport || roster.find((r) => normName(r.name) === normName(l.player))?.sport;
     const S = sp && bySport(sp);
     const cfg = sp && CFGS[sp];
@@ -202,19 +230,25 @@ function UploadSlip({ sports }) {
       line: Number(l.line), side: l.side || 'over', prob: (l.side || 'over') === 'under' ? e.pUnder : e.pOver,
       gameTime: e.commence || g?.date || null, gameId: g?.id || null, week: S.ctx.week ?? null,
     };
-  });
+  }).map((x, i) => {
+    // Flag readings that don't fit the player (e.g. 99.5 points + assists for a 30-a-game scorer).
+    const ex = x.problem ? null : expectFor(x.sport, x.player, x.market);
+    const odd = ex > 0 && (x.line / ex > 2.2 || x.line / ex < 0.4);
+    return { ...x, guessed: found[i].guessed, odd, expected: ex };
+  }); }
 
   const onFile = async (file) => {
     if (!file || !file.type.startsWith('image/')) return;
     setPreview(URL.createObjectURL(file));
-    setLegs(null);
+    setDrafts(null);
     setStatus({ phase: 'Reading your slip…', progress: 0 });
     try {
       const text = await runOcr(file, (pr) => setStatus({ phase: 'Reading your slip…', progress: pr }));
       const found = parseSlipText(text, roster, (pl) => CFGS[pl.sport]?.aliases);
       window.__geScan = { text, found }; // last scan, for debugging and tests
-      const out = resolve(found);
-      setLegs(out);
+      const prepared = prepare(found);
+      setDrafts(prepared);
+      const out = resolve(prepared);
       const good = out.filter((l) => !l.problem).length;
       setStatus({ phase: good ? `Found ${good} pick${good === 1 ? '' : 's'}${out.length > good ? ` (${out.length - good} couldn’t be matched)` : ''}` : 'Couldn’t find any picks in that image.', done: true, ok: good > 0 });
     } catch (e) {
@@ -227,7 +261,7 @@ function UploadSlip({ sports }) {
   const [mode, setMode] = useState('power');
   const track = () => {
     saveSlip({ title: `${good.length}-pick slip (uploaded)`, source: 'upload', legs: good, bet: Number(stake) > 0 ? { stake, mode, mult: mode === 'power' ? defaultMult(good.length) : null } : null });
-    setLegs(null); setStatus({ phase: `Tracking ${good.length} picks ✓`, done: true, ok: true }); setPreview(null);
+    setDrafts(null); setStatus({ phase: `Tracking ${good.length} picks ✓`, done: true, ok: true }); setPreview(null);
   };
   const toScan = () => {
     try { localStorage.setItem('ge:scan:prefill', JSON.stringify((legs || []).map((l) => ({ sport: l.sport, player: l.player, market: l.market, line: l.line, side: l.side || 'over' })))); } catch { /* ignore */ }
@@ -248,14 +282,38 @@ function UploadSlip({ sports }) {
       </div>
       {legs && legs.length > 0 && (
         <>
+          <p className="muted small up-hint">Check each pick against your slip. Tap a line or stat to fix it.</p>
           <ol className="up-legs">
-            {legs.map((l, i) => (
-              <li key={i} className={l.problem ? 'bad' : ''}>
-                <span><b>{l.player}</b><small>{l.problem ? `Skipped: ${l.problem}` : `${l.side === 'under' ? 'Less' : 'More'} ${l.line} ${l.stat} · ${SPORT_LABEL[l.sport]} · ${l.team}${l.opp ? ` vs ${l.opp}` : ''}`}</small></span>
-                {!l.problem && <em>{l.prob != null ? `${Math.round(l.prob * 100)}%` : ''}</em>}
-                <button type="button" className="up-x" onClick={() => setLegs((xs) => xs.filter((_, k) => k !== i))} aria-label={`Remove ${l.player}`}>✕</button>
-              </li>
-            ))}
+            {legs.map((l, i) => {
+              const cfg = CFGS[l.sport];
+              const set = (patch) => setDrafts((ds) => ds.map((d, k) => (k === i ? { ...d, ...patch, guessed: patch.market ? false : d.guessed } : d)));
+              return (
+                <li key={i} className={`${l.problem && l.problem !== 'stat not read' ? 'bad' : ''} ${l.odd ? 'odd' : ''}`}>
+                  <div className="up-leg-top">
+                    <b>{l.player}</b>
+                    <span className="muted small">{SPORT_LABEL[l.sport] || ''}{l.team ? ` · ${l.team}` : ''}{l.opp ? ` vs ${l.opp}` : ''}</span>
+                    <button type="button" className="up-x" onClick={() => setDrafts((ds) => ds.filter((_, k) => k !== i))} aria-label={`Remove ${l.player}`}>✕</button>
+                  </div>
+                  {cfg ? (
+                    <div className="up-leg-edit">
+                      <div className="seg up-side">
+                        <button type="button" className={l.side !== 'under' ? 'on' : ''} onClick={() => set({ side: 'over' })}>More</button>
+                        <button type="button" className={l.side === 'under' ? 'on' : ''} onClick={() => set({ side: 'under' })}>Less</button>
+                      </div>
+                      <input className="up-line" type="number" inputMode="decimal" step="0.5" value={l.line ?? ''} placeholder="Line" onChange={(e) => set({ line: e.target.value === '' ? null : Number(e.target.value) })} aria-label="Line" />
+                      <select className="up-stat" value={l.market || ''} onChange={(e) => set({ market: e.target.value || null })} aria-label="Stat">
+                        <option value="">Pick stat…</option>
+                        {Object.entries(cfg.markets).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+                      </select>
+                      <em>{l.prob != null ? `${Math.round(l.prob * 100)}%` : ''}</em>
+                    </div>
+                  ) : <small className="muted">Skipped: {l.problem}</small>}
+                  {l.problem && cfg && <small className="up-warn">{l.problem === 'stat not read' ? 'Pick the stat to include this one' : `Skipped: ${l.problem}`}</small>}
+                  {l.guessed && !l.problem && <small className="up-warn">Stat wasn’t readable, so this is a guess from the line. Check it.</small>}
+                  {l.odd && <small className="up-warn">⚠ {l.line} looks off for {l.player.split(' ').slice(-1)[0]} (usually about {Math.round(l.expected * 10) / 10}). Check this one.</small>}
+                </li>
+              );
+            })}
           </ol>
           <div className="up-bet">
             <label><span>Bet amount (optional)</span><input type="number" inputMode="decimal" min="0" placeholder="$10" value={stake} onChange={(e) => setStake(e.target.value)} /></label>
@@ -267,7 +325,7 @@ function UploadSlip({ sports }) {
           <div className="up-actions">
             <button type="button" className="btn" disabled={!good.length} onClick={track}>Track {good.length} pick{good.length === 1 ? '' : 's'}</button>
             <button type="button" className="btn-ghost" onClick={toScan}>Fix in Slip Scan</button>
-            <button type="button" className="link small" onClick={() => { setLegs(null); setStatus(null); setPreview(null); }}>Cancel</button>
+            <button type="button" className="link small" onClick={() => { setDrafts(null); setStatus(null); setPreview(null); }}>Cancel</button>
           </div>
         </>
       )}

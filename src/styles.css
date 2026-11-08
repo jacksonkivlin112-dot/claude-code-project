@@ -2567,3 +2567,13 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 .ai-free { text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--text-2); font-size: 14px; line-height: 1.45; }
 .ai-free b { color: var(--text); }
 .ai-free u { color: var(--accent); font-weight: 700; }
+.up-hint { margin: 0; }
+.up-legs li { display: flex !important; flex-direction: column; gap: 8px; align-items: stretch !important; }
+.up-leg-top { display: grid; grid-template-columns: minmax(0, 1fr) auto 36px; gap: 8px; align-items: center; }
+.up-leg-top b { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.up-leg-edit { display: grid; grid-template-columns: auto 64px minmax(0, 1fr) 42px; gap: 8px; align-items: center; }
+.up-side button { padding: 7px 10px; }
+.up-line, .up-stat { height: 40px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); font-size: 16px; padding: 0 10px; min-width: 0; }
+.up-leg-edit em { font-style: normal; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+.up-legs li.odd .up-line { border-color: var(--warn); }
+.up-warn { color: var(--warn); font-weight: 700; font-size: 13px; }

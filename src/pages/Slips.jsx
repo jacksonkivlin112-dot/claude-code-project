@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { runOcr } from './Scan.jsx';
 import { parseSlipText } from '../slipParse.js';
+import { buildRoster, nextGame } from '../slipRoster.js';
 import { normName } from '../oddsapi.js';
 import { CFGS, OWN_HOOK, SPORT_LABEL, useDualSports } from '../dualSport.jsx';
 import { defaultMult, deleteSlip, loadSlips, onSlipsChange, saveSlip, setBet, settleBet, storeResults } from '../slips.js';
@@ -174,10 +175,7 @@ function UploadSlip({ sports }) {
   const [preview, setPreview] = useState(null);
   const ready = !!sports.nfl.ctx || !!sports.nba.ctx;
 
-  const roster = useMemo(() => [
-    ...(sports.nfl.rows || []).filter((r) => r.pos !== 'K' && r.pos !== 'DEF').map((r) => ({ ...r, sport: 'nfl' })),
-    ...(sports.nba.rows || []).map((r) => ({ ...r, sport: 'nba' })),
-  ], [sports.nfl.rows, sports.nba.rows]);
+  const roster = useMemo(() => buildRoster(sports), [sports.nfl.rows, sports.nba.rows, sports.nfl.ctx, sports.nba.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
   const bySport = (sp) => sports[sp];
 
   // Turn parsed legs into trackable legs using each league's model (player id, team, game time, chance).
@@ -187,8 +185,18 @@ function UploadSlip({ sports }) {
     const cfg = sp && CFGS[sp];
     if (!S?.ctx || !cfg || !l.market || l.line == null) return { ...l, sport: sp, problem: !l.market ? 'stat not read' : l.line == null ? 'line not read' : 'player not found' };
     const e = cfg.evaluate({ id: `up:${i}`, player: l.player, market: l.market, line: Number(l.line) }, S.ctx);
-    if (!e || e.unmatched) return { ...l, sport: sp, problem: 'player not found' };
-    const g = S.ctx.gameByTeam?.[e.team];
+    if (!e || e.unmatched || !e.playerId) {
+      // Not on the loaded slate (e.g. a game tomorrow): track from the season roster and schedule.
+      const r = roster.find((x) => x.sport === sp && normName(x.name) === normName(l.player));
+      if (!r) return { ...l, sport: sp, problem: 'player not found' };
+      const g2 = nextGame(S.ctx, r.team);
+      return {
+        sport: sp, playerId: r.id, player: r.name, team: r.team, opp: g2 ? (g2.home.abbr === r.team ? g2.away.abbr : g2.home.abbr) : null,
+        market: l.market, stat: cfg.markets[l.market].short, line: Number(l.line), side: l.side || 'over', prob: null,
+        gameTime: g2?.date || null, gameId: g2?.id || null, week: S.ctx.week ?? null,
+      };
+    }
+    const g = S.ctx.gameByTeam?.[e.team] || nextGame(S.ctx, e.team);
     return {
       sport: sp, playerId: e.playerId, player: e.player, team: e.team, opp: e.opp, market: l.market, stat: cfg.markets[l.market].short,
       line: Number(l.line), side: l.side || 'over', prob: (l.side || 'over') === 'under' ? e.pUnder : e.pOver,
@@ -204,6 +212,7 @@ function UploadSlip({ sports }) {
     try {
       const text = await runOcr(file, (pr) => setStatus({ phase: 'Reading your slip…', progress: pr }));
       const found = parseSlipText(text, roster, (pl) => CFGS[pl.sport]?.aliases);
+      window.__geScan = { text, found }; // last scan, for debugging and tests
       const out = resolve(found);
       setLegs(out);
       const good = out.filter((l) => !l.problem).length;
@@ -243,7 +252,7 @@ function UploadSlip({ sports }) {
             {legs.map((l, i) => (
               <li key={i} className={l.problem ? 'bad' : ''}>
                 <span><b>{l.player}</b><small>{l.problem ? `Skipped: ${l.problem}` : `${l.side === 'under' ? 'Less' : 'More'} ${l.line} ${l.stat} · ${SPORT_LABEL[l.sport]} · ${l.team}${l.opp ? ` vs ${l.opp}` : ''}`}</small></span>
-                {!l.problem && <em>{Math.round(l.prob * 100)}%</em>}
+                {!l.problem && <em>{l.prob != null ? `${Math.round(l.prob * 100)}%` : ''}</em>}
                 <button type="button" className="up-x" onClick={() => setLegs((xs) => xs.filter((_, k) => k !== i))} aria-label={`Remove ${l.player}`}>✕</button>
               </li>
             ))}

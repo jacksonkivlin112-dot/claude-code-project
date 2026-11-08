@@ -4,6 +4,7 @@ import { useNbaContext } from '../nba/pages/Props.jsx';
 import { normName } from '../oddsapi.js';
 import { BREAKEVEN } from '../propsModel.js';
 import { parseSlipText } from '../slipParse.js';
+import { buildRoster } from '../slipRoster.js';
 import { PAYOUTS, americanOdds, breakEvenFlex, breakEvenPower, evFlex, evPower, hitDistribution, kelly, quantiles } from '../slipMath.js';
 import { SaveSlipButton } from '../components/Tracking.jsx';
 import { Avatar, Card, Empty, Segmented, SkeletonRows, TeamLogo, f1, kickoff, useUi } from '../components/ui.jsx';
@@ -22,7 +23,8 @@ async function preprocess(file) {
     i.onerror = reject;
     i.src = URL.createObjectURL(file);
   });
-  const scale = img.width < 1100 ? 2 : 1;
+  // Enlarge so small app text is ~2x what OCR needs: full-phone screenshots are ~1170px wide.
+  const scale = Math.min(2, Math.max(1, 2200 / img.width));
   const c = document.createElement('canvas');
   c.width = img.width * scale;
   c.height = img.height * scale;
@@ -73,13 +75,7 @@ export function NbaScanRoute() {
 
 function ScanPage({ home, own }) {
   const [sports, bridge] = useDualSports(home, own);
-  const roster = useMemo(
-    () => [
-      ...(sports.nfl.rows || []).filter((r) => r.pos !== 'K' && r.pos !== 'DEF').map((r) => ({ ...r, sport: 'nfl' })),
-      ...(sports.nba.rows || []).map((r) => ({ ...r, sport: 'nba' })),
-    ],
-    [sports.nfl.rows, sports.nba.rows], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  const roster = useMemo(() => buildRoster(sports), [sports.nfl.rows, sports.nba.rows, sports.nfl.ctx, sports.nba.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
   const byName = useMemo(() => {
     const m = new Map();
     for (const r of roster) if (!m.has(normName(r.name))) m.set(normName(r.name), r);

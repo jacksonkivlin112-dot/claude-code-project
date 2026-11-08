@@ -85,7 +85,7 @@ const STAT_WORDS = ['points', 'pts', 'rebounds', 'rebs', 'reb', 'assists', 'asts
   'carries', 'fantasy', 'score'];
 /** Fix common OCR slips in stat names before matching them. */
 function fixStatText(t) {
-  let x = t.replace(/\b3\s*-?\s*[p7][t7]s?\b/gi, '3-pt').replace(/\b[|il](?=(rebs?|asts?|pts|reb|ast)\b)/gi, '');
+  let x = t.replace(/\b3\s*[-.–·]?\s*[p7][t7]s?\b/gi, '3-pt').replace(/\b[|il](?=(rebs?|asts?|pts|reb|ast)\b)/gi, '');
   x = x.split(/(\+|\s+)/).map((w) => {
     const lw = w.toLowerCase();
     if (lw.length < 3 || STAT_WORDS.includes(lw) || /\d/.test(lw)) return w;
@@ -112,19 +112,36 @@ export function parseSlipText(text, roster, aliases) {
     const m = findPlayer(l, roster);
     if (m && !(hits.length && hits[hits.length - 1].idx === i - 1 && hits[hits.length - 1].p.id === m.p.id)) hits.push({ idx: i, ...m });
   });
+  // A slip is usually one league: re-match weak matches from the other league within the main one
+  // (e.g. "Brooks" on an all-NBA slip is Dillon Brooks, not an NFL Brooks).
+  const strong = hits.filter((h) => h.score >= 0.9 && h.p.sport);
+  const counts = strong.reduce((m, h) => ({ ...m, [h.p.sport]: (m[h.p.sport] || 0) + 1 }), {});
+  const main = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  if (main && main[1] >= 2 && main[1] >= strong.length * 0.6) {
+    const same = roster.filter((p) => p.sport === main[0]);
+    hits.forEach((h, k) => {
+      if (h.p.sport === main[0] || h.score >= 1) return;
+      const alt = findPlayer(lines[h.idx], same);
+      if (alt) hits[k] = { ...h, ...alt };
+      else hits[k] = { ...h, drop: true };
+    });
+  }
   const legs = [];
   const seen = new Set();
-  hits.forEach((h, k) => {
-    const end = Math.min(lines.length, (hits[k + 1]?.idx ?? lines.length), h.idx + 6);
+  hits.filter((h) => !h.drop).forEach((h, k, kept) => {
+    const end = Math.min(lines.length, (kept[k + 1]?.idx ?? lines.length), h.idx + 6);
     const windowLines = lines.slice(h.idx, end);
     // Take the stat and number from the lines closest to the player name.
     let mk = null;
     let line = null;
+    const nameParts = h.p.name.split(/\s+/).filter((w) => w.length > 1);
     for (const l of windowLines) {
-      if (!mk) mk = matchMarket(clean(l), tableFor(h.p)) || matchMarket(clean(fixStatText(l)), tableFor(h.p));
+      // Match the stat without the player's own name (so "Brooks" never reads as "blocks").
+      const noName = nameParts.reduce((t, w) => t.replace(new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'ig'), ' '), l);
+      if (!mk) mk = matchMarket(clean(noName), tableFor(h.p)) || matchMarket(clean(fixStatText(noName)), tableFor(h.p));
       if (line == null) {
         // Rejoin decimals OCR split with a comma, middle dot or stray space: "24,5" "24 .5" "24·5".
-        const t = l.replace(/(\d{1,3})[sS](?=\s|$)/g, '$1').replace(/(\d{1,3})\s*[,·•'`]\s*([05])(?!\d)/g, '$1.$2').replace(/(\d{1,3})\s+\.\s*([05])(?!\d)/g, '$1.$2');
+        const t = l.replace(/(\d{1,3})[sS](?=\s|$)/g, '$1').replace(/(\d{1,3})\s*[,·•'`]\s*([05])(?!\d)/g, '$1.$2').replace(/(?<![\w-])(\d{1,3})-([05])(?![\d\w])/g, '$1.$2').replace(/(\d{1,3})\s+\.\s*([05])(?!\d)/g, '$1.$2');
         const nums = [...t.replace(/\d{1,2}:\d{2}/g, ' ').replace(/#\d+/g, ' ').replace(/\$\d+(\.\d+)?/g, ' ').matchAll(/(?<![\w.])(\d{1,3}(?:\.\d)?)(?![\d%:])/g)].map((x) => parseFloat(x[1]));
         const half = nums.find((x) => Math.abs((x % 1) - 0.5) < 1e-6);
         line = half ?? null;

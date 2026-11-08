@@ -51,7 +51,7 @@ export default function TennisHome() {
           {groups.length === 0 ? <Card><Empty title="No matches this day">Pick another day above.</Empty></Card> : groups.map(([name, list]) => (
             <section key={name} className="hs">
               <SectionHead title={name} />
-              <div className="t-list" style={{ '--rows': Math.min(4, list.length) }}>{list.map((m) => <MatchRow key={m.id} m={m} d={data} />)}</div>
+              <div className="t-list" style={{ '--rows': Math.min(3, list.length) }}>{list.map((m) => <MatchRow key={m.id} m={m} d={data} />)}</div>
             </section>
           ))}
           <p className="muted small t-note">Win chances come from player ratings built on every result since last season, checked against matches the model hadn’t seen. During live matches they update from the current set and game score.</p>

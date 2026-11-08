@@ -7,6 +7,7 @@ import { NFL_CFG, useNflContext, usePropLines } from '../pages/Props.jsx';
 import * as CFB_API from '../cfb/api.js';
 import { CFB_CFG } from '../cfb/pages/Props.jsx';
 import { TOOLS, runTool, toolLabel } from './tools.js';
+import { localAnswer } from './local.js';
 
 const KEY = 'ge:ai:key';
 const MODEL_KEY = 'ge:ai:model';
@@ -77,7 +78,7 @@ const SUGGEST = {
 export default function Assistant({ sport, onClose }) {
   const [apiKey, setApiKey] = useState(() => ls.get(KEY));
   const [model, setModel] = useState(() => ls.get(MODEL_KEY) || MODELS[0].id);
-  const [settings, setSettings] = useState(!ls.get(KEY));
+  const [settings, setSettings] = useState(false);
   const [draftKey, setDraftKey] = useState('');
   const [items, setItems] = useState([]); // chat view
   const [input, setInput] = useState('');
@@ -101,17 +102,27 @@ export default function Assistant({ sport, onClose }) {
   async function send(text) {
     const q = text.trim();
     if (!q || busy) return;
-    if (!apiKey) { setSettings(true); return; }
     setInput('');
     setBusy(true);
     setItems((xs) => [...xs, { role: 'user', text: q }, { role: 'assistant', text: '', tools: [], thinking: true }]);
+    // Free mode (no key): quick answers from the app's own data and models.
+    const free = async (note) => {
+      try {
+        const r = await localAnswer(q, sink.current, sport);
+        patchLast((m) => ({ ...m, thinking: false, text: r.text, tools: r.tools.map(toolLabel), note: note || null, free: true }));
+      } catch (e) {
+        patchLast((m) => ({ ...m, thinking: false, error: `Couldn’t answer that: ${e.message || e}` }));
+      }
+    };
+    if (!apiKey) { await free(); setBusy(false); return; }
     const context = `[App context: today is ${new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, local time ${new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}; the user is on the ${sport === 'tennis' ? 'Tennis' : sport === 'cfb' ? 'college football (CFB)' : sport.toUpperCase()} tab.]`;
     msgs.current.push({ role: 'user', content: `${context}\n\n${q}` });
     const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-    const canFallback = model !== 'claude-haiku-5-5';
+    let canFallback = model !== 'claude-haiku-5-5';
+    const startLen = msgs.current.length;
     try {
       for (let step = 0; step < MAX_STEPS; step++) {
-        const stream = client.beta.messages.stream({
+        const params = {
           model,
           max_tokens: 16000,
           ...(canFallback ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' } : {}),
@@ -120,10 +131,24 @@ export default function Assistant({ sport, onClose }) {
           system: SYSTEM,
           tools: TOOLS,
           messages: msgs.current,
-        });
+        };
+        let stream = client.beta.messages.stream(params);
         streamRef.current = stream;
         stream.on('text', (delta) => patchLast((m) => ({ ...m, text: m.text + delta, thinking: false })));
-        const msg = await stream.finalMessage();
+        let msg;
+        try {
+          msg = await stream.finalMessage();
+        } catch (e) {
+          // Some accounts don't have the refusal-fallback beta: retry once without it.
+          if (canFallback && e instanceof Anthropic.BadRequestError) {
+            canFallback = false;
+            const { betas, fallbacks, ...rest } = params; // eslint-disable-line no-unused-vars
+            stream = client.beta.messages.stream(rest);
+            streamRef.current = stream;
+            stream.on('text', (delta) => patchLast((m) => ({ ...m, text: m.text + delta, thinking: false })));
+            msg = await stream.finalMessage();
+          } else throw e;
+        }
         msgs.current.push({ role: 'assistant', content: msg.content });
         if (msg.stop_reason === 'refusal') {
           patchLast((m) => ({ ...m, thinking: false, note: 'Claude declined to answer this one. Try rephrasing.' }));
@@ -156,7 +181,13 @@ export default function Assistant({ sport, onClose }) {
         : e instanceof Anthropic.APIConnectionError ? 'Couldn’t reach Claude. Check your connection.'
         : e instanceof Anthropic.APIError ? `Claude API error ${e.status}: ${e.message}`
         : `Something went wrong: ${e.message || e}`;
-      patchLast((m) => ({ ...m, thinking: false, error: msg }));
+      if (e instanceof Anthropic.APIUserAbortError) patchLast((m) => ({ ...m, thinking: false, error: msg }));
+      else {
+        // Claude failed: drop the unanswered turn and give a free-mode answer instead.
+        msgs.current = msgs.current.slice(0, startLen - 1);
+        patchLast((m) => ({ ...m, text: '', tools: [] }));
+        await free(`Claude didn’t respond (${msg}) so this is a quick answer from the app’s data.`);
+      }
     } finally {
       streamRef.current = null;
       patchLast((m) => ({ ...m, thinking: false }));
@@ -179,7 +210,7 @@ export default function Assistant({ sport, onClose }) {
       <DataProvider api={CFB_API} sport="cfb"><Bridge sport="cfb" sink={sink} onReady={(s) => setReady((r) => ({ ...r, [s]: true }))} /></DataProvider>
       <div className="ai-panel" onClick={(e) => e.stopPropagation()}>
         <header className="ai-head">
-          <span className="ai-title"><span className="ai-spark" aria-hidden>✦</span> Edge AI <small>{MODELS.find((m) => m.id === model)?.label}</small></span>
+          <span className="ai-title"><span className="ai-spark" aria-hidden>✦</span> Edge AI <small>{apiKey ? MODELS.find((m) => m.id === model)?.label : 'Free mode'}</small></span>
           <span className="ai-head-btns">
             {items.length > 0 && <button type="button" className="icon-btn" onClick={reset} title="New chat" aria-label="New chat">↺</button>}
             <button type="button" className={`icon-btn ${settings ? 'on' : ''}`} onClick={() => setSettings((s) => !s)} title="Settings" aria-label="Settings">⚙</button>
@@ -218,6 +249,7 @@ export default function Assistant({ sport, onClose }) {
               {items.length === 0 && (
                 <div className="ai-empty">
                   <p><b>Ask anything about tonight’s games, players, props or your slips.</b> Answers use the same live data and models as the app.</p>
+                  {!apiKey && <button type="button" className="ai-free" onClick={() => setSettings(true)}><b>Free mode</b> answers picks, props, players, scores and your slips. <u>Add a Claude key</u> for full conversations.</button>}
                   <div className="ai-suggest">
                     {SUGGEST[sport].map((s) => <button key={s} type="button" onClick={() => send(s)}>{s}</button>)}
                   </div>

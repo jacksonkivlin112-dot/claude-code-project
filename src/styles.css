@@ -2564,3 +2564,6 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
   .dock-search { width: 64px; height: 64px; }
   .league-tabs a { font-size: 22px; }
 }
+.ai-free { text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--text-2); font-size: 14px; line-height: 1.45; }
+.ai-free b { color: var(--text); }
+.ai-free u { color: var(--accent); font-weight: 700; }

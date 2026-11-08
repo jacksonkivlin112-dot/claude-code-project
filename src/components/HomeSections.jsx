@@ -86,15 +86,14 @@ export function GamesSection({ games, sport, spreadOf, onStandings }) {
   const order = { in: 0, pre: 1, post: 2 };
   const [favs] = useFavorites(sport);
   const best = (g) => Math.min(g.rank?.home && g.rank.home <= 25 ? g.rank.home : 99, g.rank?.away && g.rank.away <= 25 ? g.rank.away : 99);
-  const [showAll, setShowAll] = useState(false);
   const sorted = [...games].sort((a, b) => order[a.state] - order[b.state] || favoriteRank(b, favs) - favoriteRank(a, favs) || best(a) - best(b) || new Date(a.date) - new Date(b.date));
-  const CAP = 16;
-  const list = showAll ? sorted : sorted.slice(0, CAP);
+  // Games flow into columns of up to 4 that scroll sideways, so the whole slate fits on one screen.
+  const list = sorted;
   return (
     <section className="hs">
       <SectionHead title="Games" more="Standings" onMore={onStandings} />
       {list.length === 0 ? <p className="muted hs-empty">No games on this day.</p> : (
-        <div className="gs-grid">
+        <div className="gs-grid" style={{ '--rows': Math.min(4, list.length) }}>
           {list.map((g) => {
             const spread = spreadOf?.(g);
             return (
@@ -123,7 +122,6 @@ export function GamesSection({ games, sport, spreadOf, onStandings }) {
           })}
         </div>
       )}
-      {sorted.length > CAP && <button type="button" className="more-btn card" onClick={() => setShowAll((x) => !x)}>{showAll ? 'Show fewer games' : `Show all ${sorted.length} games`}</button>}
     </section>
   );
 }

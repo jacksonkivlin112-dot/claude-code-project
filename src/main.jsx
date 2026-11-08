@@ -22,3 +22,32 @@ createRoot(document.getElementById('root')).render(
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {}); });
 }
+
+// New-version check: the installed app has no pull-to-refresh, so compare the deployed
+// bundle with the running one when the app comes back to the foreground (and every 10 min),
+// and offer a one-tap update.
+if (import.meta.env.PROD) {
+  const current = [...document.scripts].map((s) => s.src).find((s) => /assets\/index-/.test(s));
+  let shown = false;
+  const check = async () => {
+    if (shown || !current) return;
+    try {
+      const html = await (await fetch(`${import.meta.env.BASE_URL}index.html?ts=${Date.now()}`, { cache: 'no-store' })).text();
+      const latest = html.match(/assets\/index-[^"']+\.js/)?.[0];
+      if (latest && !current.endsWith(latest)) {
+        shown = true;
+        const bar = document.createElement('button');
+        bar.className = 'update-bar';
+        bar.textContent = 'New version available · Tap to update';
+        bar.onclick = async () => {
+          try { const regs = await navigator.serviceWorker?.getRegistrations?.(); await Promise.all((regs || []).map((r) => r.update())); } catch { /* ignore */ }
+          window.location.reload();
+        };
+        document.body.appendChild(bar);
+      }
+    } catch { /* offline */ }
+  };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+  setInterval(check, 10 * 60 * 1000);
+  setTimeout(check, 5000);
+}

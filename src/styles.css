@@ -2428,3 +2428,4 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 .pp-card-big small { font-size: 18px; color: var(--text-2); font-weight: 600; }
 .pp-card-sub { font-size: 13px; color: var(--text-3); font-weight: 600; }
 @media (max-width: 380px) { .pp-id h2 { font-size: 23px; } .pp-photo { width: 78px; height: 78px; } .pp-ranks b { font-size: 20px; } .pp-card-big b { font-size: 30px; } }
+.update-bar { position: fixed; z-index: 90; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 10px); padding: 12px 18px; border-radius: 999px; border: 0; background: var(--grad-strong); color: #fff; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.6); animation: fade 0.25s ease; white-space: nowrap; }

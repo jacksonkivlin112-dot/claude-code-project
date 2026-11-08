@@ -3,7 +3,8 @@ import { runOcr } from './Scan.jsx';
 import { parseSlipText } from '../slipParse.js';
 import { normName } from '../oddsapi.js';
 import { CFGS, OWN_HOOK, SPORT_LABEL, useDualSports } from '../dualSport.jsx';
-import { deleteSlip, loadSlips, onSlipsChange, saveSlip, storeResults } from '../slips.js';
+import { defaultMult, deleteSlip, loadSlips, onSlipsChange, saveSlip, setBet, settleBet, storeResults } from '../slips.js';
+import { PAYOUTS } from '../slipMath.js';
 import { legStatus } from '../tracker.js';
 import { LegBar, useSlipAlerts } from '../components/Tracking.jsx';
 import { Avatar, Card, Empty, kickoff, timeAgo, useNow } from '../components/ui.jsx';
@@ -17,16 +18,19 @@ function statusOf(leg, sports) {
   return legStatus(leg, { markets: CFGS[leg.sport].markets, season: ctx.season, liveById: ctx.liveById, gameByTeam: ctx.gameByTeam });
 }
 
+const lastGame = (s) => Math.max(s.created || 0, ...s.legs.map((l) => new Date(l.gameTime || 0).getTime()));
+const money = (n, sign = false) => `${sign && n > 0 ? '+' : n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: Math.abs(n) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
 function slipState(sts) {
   const hit = sts.filter((s) => s.state === 'final' && s.hit).length;
   const miss = sts.filter((s) => s.state === 'final' && !s.hit && !s.push).length;
   const voids = sts.filter((s) => s.state === 'void' || s.push).length;
   const open = sts.length - hit - miss - voids;
   const live = sts.some((s) => s.state === 'live');
-  if (miss) return { key: 'lost', label: open ? `Lost · ${miss} miss${miss > 1 ? 'es' : ''}` : `Lost · ${hit} of ${sts.length} hit`, hit, miss, open };
-  if (!open) return { key: 'won', label: voids ? `Won · ${hit} hit, ${voids} void` : `Won · all ${hit} hit`, hit, miss, open };
-  if (live || hit) return { key: 'live', label: `Live · ${hit} of ${sts.length} hit so far`, hit, miss, open };
-  return { key: 'pending', label: 'Upcoming', hit, miss, open };
+  if (miss) return { key: 'lost', label: open ? `Lost · ${miss} miss${miss > 1 ? 'es' : ''}` : `Lost · ${hit} of ${sts.length} hit`, hit, miss, open, voids };
+  if (!open) return { key: 'won', label: voids ? `Won · ${hit} hit, ${voids} void` : `Won · all ${hit} hit`, hit, miss, open, voids };
+  if (live || hit) return { key: 'live', label: `Live · ${hit} of ${sts.length} hit so far`, hit, miss, open, voids };
+  return { key: 'pending', label: 'Upcoming', hit, miss, open, voids };
 }
 
 export default function Slips() { return <SlipsPage home="nfl" own={OWN_HOOK.nfl()} />; }
@@ -41,7 +45,9 @@ function SlipsPage({ home, own }) {
 
   const view = useMemo(() => slips.map((s) => {
     const sts = s.legs.map((l) => statusOf(l, sports));
-    return { slip: s, sts, st: slipState(sts) };
+    const st = slipState(sts);
+    const settled = st.open === 0 ? settleBet(s.bet, s.legs.length, st.hit, st.miss, st.voids) : null;
+    return { slip: s, sts, st, settled };
   }), [slips, sports]);
 
   // Keep final results with the slip.
@@ -70,9 +76,9 @@ function SlipsPage({ home, own }) {
   useSlipAlerts(perm === 'granted' ? events : []);
 
   const ask = async () => { try { setPerm(await Notification.requestPermission()); } catch { /* ignore */ } };
-  const active = view.filter((v) => v.st.key === 'live' || v.st.key === 'pending');
-  const settled = view.filter((v) => v.st.key === 'won' || v.st.key === 'lost');
-  const won = settled.filter((v) => v.st.key === 'won').length;
+  // A slip is finished once every leg is decided (a Flex slip can still pay after a miss).
+  const active = view.filter((v) => v.st.open > 0);
+  const settled = view.filter((v) => v.st.open === 0).sort((a, b) => lastGame(b.slip) - lastGame(a.slip));
 
   return (
     <div className="page">
@@ -90,10 +96,8 @@ function SlipsPage({ home, own }) {
         </div>
       </div>
       {bridge}
+      {settled.length > 0 && <BetRecord settled={settled} openCount={active.length} />}
       <UploadSlip sports={sports} />
-      {settled.length > 0 && (
-        <div className="record-bar"><span>Your saved slips:</span><strong className={won ? 'pos-txt' : ''}>{won}-{settled.length - won}</strong><span className="muted">{active.length} still open</span></div>
-      )}
       {view.length === 0 ? (
         <Card>
           <Empty title="No saved slips yet">
@@ -148,6 +152,7 @@ function SlipCard({ v }) {
           );
         })}
       </ol>
+      <BetLine v={v} />
       <footer className="slipc-foot">
         {confirm ? (
           <>
@@ -209,8 +214,10 @@ function UploadSlip({ sports }) {
   };
 
   const good = (legs || []).filter((l) => !l.problem);
+  const [stake, setStake] = useState('');
+  const [mode, setMode] = useState('power');
   const track = () => {
-    saveSlip({ title: `${good.length}-pick slip (uploaded)`, source: 'upload', legs: good });
+    saveSlip({ title: `${good.length}-pick slip (uploaded)`, source: 'upload', legs: good, bet: Number(stake) > 0 ? { stake, mode, mult: mode === 'power' ? defaultMult(good.length) : null } : null });
     setLegs(null); setStatus({ phase: `Tracking ${good.length} picks ✓`, done: true, ok: true }); setPreview(null);
   };
   const toScan = () => {
@@ -241,6 +248,13 @@ function UploadSlip({ sports }) {
               </li>
             ))}
           </ol>
+          <div className="up-bet">
+            <label><span>Bet amount (optional)</span><input type="number" inputMode="decimal" min="0" placeholder="$10" value={stake} onChange={(e) => setStake(e.target.value)} /></label>
+            <div className="seg">
+              <button type="button" className={mode === 'power' ? 'on' : ''} onClick={() => setMode('power')}>Power{defaultMult(good.length) ? ` ${defaultMult(good.length)}x` : ''}</button>
+              {PAYOUTS.flex[good.length] && <button type="button" className={mode === 'flex' ? 'on' : ''} onClick={() => setMode('flex')}>Flex</button>}
+            </div>
+          </div>
           <div className="up-actions">
             <button type="button" className="btn" disabled={!good.length} onClick={track}>Track {good.length} pick{good.length === 1 ? '' : 's'}</button>
             <button type="button" className="btn-ghost" onClick={toScan}>Fix in Slip Scan</button>
@@ -249,5 +263,94 @@ function UploadSlip({ sports }) {
         </>
       )}
     </section>
+  );
+}
+
+/** Career betting record across finished slips that have a bet amount. */
+function BetRecord({ settled, openCount }) {
+  const bets = settled.filter((v) => v.settled).slice().reverse(); // oldest first
+  const noBet = settled.filter((v) => !v.settled).length;
+  const wins = bets.filter((v) => v.settled.profit > 0).length;
+  const losses = bets.filter((v) => v.settled.profit < 0).length;
+  const pushes = bets.length - wins - losses;
+  const wagered = bets.reduce((a, v) => a + v.slip.bet.stake, 0);
+  const net = Math.round(bets.reduce((a, v) => a + v.settled.profit, 0) * 100) / 100;
+  const best = bets.reduce((m, v) => Math.max(m, v.settled.profit), 0);
+  let streak = 0; let kind = null;
+  for (const v of [...bets].reverse()) {
+    const k = v.settled.profit > 0 ? 'W' : v.settled.profit < 0 ? 'L' : null;
+    if (!k) continue;
+    if (!kind) kind = k;
+    if (k !== kind) break;
+    streak += 1;
+  }
+  // Cumulative profit line.
+  let run = 0;
+  const pts = [0, ...bets.map((v) => (run += v.settled.profit))];
+  const lo = Math.min(...pts); const hi = Math.max(...pts); const span = hi - lo || 1;
+  const path = pts.map((y, i) => `${(i / Math.max(1, pts.length - 1)) * 100},${40 - ((y - lo) / span) * 36 - 2}`).join(' ');
+  const zeroY = 40 - ((0 - lo) / span) * 36 - 2;
+  const slipsWon = settled.filter((v) => v.st.key === 'won').length;
+  return (
+    <section className={`betrec ${net > 0 ? 'up' : net < 0 ? 'down' : ''}`}>
+      <div className="betrec-top">
+        <div>
+          <span className="betrec-lbl">My betting record</span>
+          <strong className="betrec-net">{bets.length ? money(net, true) : `${slipsWon}-${settled.length - slipsWon}`}</strong>
+          <small>{bets.length ? `${net >= 0 ? 'profit' : 'loss'} on ${money(wagered)} wagered · ROI ${wagered ? `${net >= 0 ? '+' : ''}${((net / wagered) * 100).toFixed(1)}%` : '—'}` : 'Add a bet amount to your slips to track profit'}</small>
+        </div>
+        {bets.length > 1 && (
+          <svg className="betrec-chart" viewBox="0 0 100 40" preserveAspectRatio="none" aria-label="Profit over time">
+            <line x1="0" x2="100" y1={zeroY} y2={zeroY} className="zero" />
+            <polyline points={path} />
+          </svg>
+        )}
+      </div>
+      <div className="betrec-grid">
+        <div><b className="pos-txt">{bets.length ? wins : slipsWon}</b><small>Wins</small></div>
+        <div><b className="neg-txt">{bets.length ? losses : settled.length - slipsWon}</b><small>Losses</small></div>
+        <div><b>{bets.length ? `${Math.round((wins / Math.max(1, wins + losses)) * 100)}%` : `${Math.round((slipsWon / settled.length) * 100)}%`}</b><small>Win rate</small></div>
+        <div><b>{bets.length ? money(best, true) : '—'}</b><small>Best win</small></div>
+        <div><b>{streak ? `${kind}${streak}` : '—'}</b><small>Streak</small></div>
+        <div><b>{openCount}</b><small>Open slips</small></div>
+      </div>
+      {(noBet > 0 || pushes > 0) && <p className="muted small">{noBet > 0 ? `${noBet} finished slip${noBet === 1 ? ' has' : 's have'} no bet amount, so ${noBet === 1 ? 'it’s' : 'they’re'} not in the profit. ` : ''}{pushes > 0 ? `${pushes} refunded (voided legs).` : ''}</p>}
+    </section>
+  );
+}
+
+/** Bet amount and payout for one slip, with the result once it's finished. */
+function BetLine({ v }) {
+  const { slip, settled } = v;
+  const n = slip.legs.length;
+  const [edit, setEdit] = useState(false);
+  const [stake, setStake] = useState(slip.bet?.stake ?? '');
+  const [mode, setMode] = useState(slip.bet?.mode || 'power');
+  const [mult, setMult] = useState(slip.bet?.mult ?? defaultMult(n, 'power') ?? '');
+  const flexOk = !!PAYOUTS.flex[n];
+  const b = slip.bet;
+  if (edit) {
+    return (
+      <div className="betline edit">
+        <label><span>Bet</span><input type="number" inputMode="decimal" min="0" step="1" value={stake} placeholder="10" onChange={(e) => setStake(e.target.value)} /></label>
+        <div className="seg">
+          <button type="button" className={mode === 'power' ? 'on' : ''} onClick={() => setMode('power')}>Power</button>
+          {flexOk && <button type="button" className={mode === 'flex' ? 'on' : ''} onClick={() => setMode('flex')}>Flex</button>}
+        </div>
+        {mode === 'power' ? <label><span>Pays</span><input type="number" inputMode="decimal" min="1" step="0.1" value={mult} onChange={(e) => setMult(e.target.value)} />x</label>
+          : <small className="muted">Pays {Object.entries(PAYOUTS.flex[n]).sort((a, c) => c[0] - a[0]).map(([k, x]) => `${k}/${n}: ${x}x`).join(' · ')}</small>}
+        <button type="button" className="btn" onClick={() => { setBet(slip.id, { stake, mode, mult: mode === 'power' ? mult : null }); setEdit(false); }} disabled={!(Number(stake) > 0)}>Save</button>
+        {b && <button type="button" className="link small" onClick={() => { setBet(slip.id, null); setEdit(false); }}>Remove</button>}
+      </div>
+    );
+  }
+  if (!b) return <div className="betline"><button type="button" className="link" onClick={() => setEdit(true)}>＋ Add bet amount</button><small className="muted">to count it in your profit</small></div>;
+  const toWin = b.mode === 'power' ? b.stake * (b.mult || defaultMult(n) || 0) : null;
+  return (
+    <div className="betline">
+      <span>{money(b.stake)} · {b.mode === 'power' ? `Power ${b.mult || defaultMult(n)}x` : 'Flex'}{toWin ? <span className="muted"> · pays {money(toWin)}</span> : null}</span>
+      {settled ? <strong className={settled.profit > 0 ? 'pos-txt' : settled.profit < 0 ? 'neg-txt' : ''}>{settled.refunded ? 'Refunded' : money(settled.profit, true)}</strong> : <small className="muted">pending</small>}
+      <button type="button" className="link small" onClick={() => setEdit(true)}>Edit</button>
+    </div>
   );
 }

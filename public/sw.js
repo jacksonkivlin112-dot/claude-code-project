@@ -1,6 +1,6 @@
 // Gridiron Edge service worker: makes the app installable and quick to open.
 // App files (hashed assets) are cached; pages and data always try the network first.
-const CACHE = 'ge-v1';
+const CACHE = 'ge-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './favicon.svg', './icon-192.png'];
 
 self.addEventListener('install', (e) => {

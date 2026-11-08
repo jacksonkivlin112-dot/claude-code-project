@@ -118,6 +118,7 @@ function ScanPage({ home, own }) {
       const text = await runOcr(file, (p) => setStatus({ phase: 'Reading screenshot…', progress: p }));
       setRawText(text);
       const found = parseSlipText(text, roster, aliasesFor);
+      window.__geScan = { text, found }; // last scan, for debugging and tests
       setLegs(found.length ? found : []);
       setStatus({ phase: found.length ? `Found ${found.length} leg${found.length === 1 ? '' : 's'}` : 'No players recognized. Add the legs below or check the extracted text.', done: true, ok: found.length > 0 });
     } catch (e) {

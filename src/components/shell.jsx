@@ -254,7 +254,8 @@ export function MobileNav({ route }) {
       <nav className="mobile-nav" aria-label="Primary mobile">
         {items.map((n) => (
           <a key={n.path} href={href(route.sport, n.path)} className={route.path === n.path ? 'active' : ''} aria-label={n.label} title={n.label}>
-            <Icon d={n.icon} size={22} />
+            <Icon d={n.icon} size={27} />
+            <span className="mn-label">{n.short || n.label}</span>
           </a>
         ))}
       </nav>
@@ -264,7 +265,7 @@ export function MobileNav({ route }) {
         aria-label="Search players"
         onClick={() => { try { sessionStorage.setItem('ge:focusSearch', '1'); } catch { /* ignore */ } }}
       >
-        <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4" size={24} />
+        <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4" size={28} />
       </a>
     </div>
   );

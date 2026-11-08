@@ -96,6 +96,19 @@ function fixStatText(t) {
   return x;
 }
 
+// Game header rows ("NBA DEN 114 vs IND 102 Final") sit inside a pick's area: never read numbers from them.
+const HEADER = /\b[a-z]{2,4}\s*\d{1,3}\s*(vs\.?|@)\s*[a-z]{2,4}\s*\d{1,3}\b|^\s*(nba|nfl|cfb|ncaaf|nhl|mlb)\b/i;
+/** Remove PrizePicks icon artifacts: the ↑/↓ arrow and goblin/demon badges read as "1™", "M™", "M245". */
+const deIcon = (l) => l.replace(/\S?[™®]/g, ' ').replace(/(^|\s)[A-Za-z](\d{2,4})\b/g, '$1$2').replace(/(?<![\d.])0(\d)\b/g, '0.$1');
+const LOOKS = { a: '4', A: '4', s: '5', S: '5', o: '0', O: '0', l: '1', I: '1', i: '1', z: '2', Z: '2', B: '8', g: '9', q: '9', b: '6', G: '6', T: '7' };
+/** A line value read as letters after the arrow ("Mas" for 4.5): map look-alike letters back to digits. */
+function lettersAsNumber(tok) {
+  const m = tok.match(/^[M1↑↓]?([A-Za-z0-9]{2,3})$/);
+  if (!m) return null;
+  const d = [...m[1]].map((c) => (/\d/.test(c) ? c : LOOKS[c])).join('');
+  return /^\d{2,4}$/.test(d) ? parseFloat(d) : null;
+}
+
 const SIDE_OVER = /\b(more|higher|over|mor)\b|▲|↑/i;
 const SIDE_UNDER = /\b(less|lower|under)\b|▼|↓/i;
 
@@ -135,7 +148,27 @@ export function parseSlipText(text, roster, aliases) {
     let mk = null;
     let line = null;
     const nameParts = h.p.name.split(/\s+/).filter((w) => w.length > 1);
+    // PrizePicks-style rows put the line at the end of the player's row: take the last number after the name.
+    {
+      const row = lines[h.idx];
+      const last = h.p.name.split(/\s+/).slice(-1)[0];
+      const at = row.toLowerCase().lastIndexOf(last.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+      const tail = deIcon(at >= 0 ? row.slice(at + last.length) : row).replace(/#\d+/g, ' ').replace(/\b3\s*[-.]?\s*p(oin)?t(er)?s?m?\b/gi, ' ').replace(/\d{1,2}:\d{2}\s*(am|pm)?/gi, ' ');
+      // A small ".5" can land as its own token: "24 5" -> 24.5.
+      const joined = tail.replace(/(\d{1,3})\s+([05])\s*$/, '$1.$2');
+      const nums = [...joined.matchAll(/(?<![\w.])(\d{1,4}(?:\.\d)?)(?![\d%:])/g)].map((x) => x[1]);
+      if (nums.length) {
+        const withDot = nums.filter((x) => x.includes('.'));
+        const raw = withDot.length ? withDot[withDot.length - 1] : nums[nums.length - 1];
+        line = raw.includes('.') ? parseFloat(raw) : { raw: parseFloat(raw) };
+      } else {
+        const toks = tail.trim().split(/\s+/).filter(Boolean);
+        const n = toks.length ? lettersAsNumber(toks[toks.length - 1]) : null;
+        if (n != null) line = { raw: n };
+      }
+    }
     for (const l of windowLines) {
+      if (HEADER.test(l) && !l.includes(h.p.name.split(/\s+/).slice(-1)[0])) continue;
       // Match the stat without the player's own name (so "Brooks" never reads as "blocks").
       const noName = nameParts.reduce((t, w) => t.replace(new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'ig'), ' '), l);
       if (!mk) mk = matchMarket(clean(noName), tableFor(h.p)) || matchMarket(clean(fixStatText(noName)), tableFor(h.p));
@@ -148,9 +181,10 @@ export function parseSlipText(text, roster, aliases) {
       }
       if (mk && line != null) break;
     }
+    if (line && typeof line === 'object') line = repairLine(line.raw, false, mk?.key, h.p);
     if (line == null) {
       // No clean x.5 number: take the first plain number near the name and repair its decimal.
-      const text = windowLines.join(' ').replace(/(\d{1,4})[sS](?=\s|$)/g, '$1').replace(/\d{1,2}:\d{2}\s*(am|pm)?/gi, ' ').replace(/#\d+/g, ' ').replace(/\$\d+(\.\d+)?/g, ' ');
+      const text = windowLines.filter((l) => !HEADER.test(l)).map(deIcon).join(' ').replace(/(\d{1,4})[sS](?=\s|$)/g, '$1').replace(/\d{1,2}:\d{2}\s*(am|pm)?/gi, ' ').replace(/#\d+/g, ' ').replace(/\$\d+(\.\d+)?/g, ' ');
       const any = text.match(/(?<![\w.$])(\d{1,4})(?![\d%:.])/);
       if (any) line = repairLine(parseFloat(any[1]), false, mk?.key, h.p);
     }

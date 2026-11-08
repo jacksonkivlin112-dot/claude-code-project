@@ -212,7 +212,7 @@ export const NBA_ALIASES = [
   ['player_points_assists', ['pts+asts', 'pts+ast', 'points+assists', 'p+a', 'pa']],
   ['player_rebounds_assists', ['rebs+asts', 'reb+ast', 'rebounds+assists', 'r+a', 'ra']],
   ['player_blocks_steals', ['blks+stls', 'blk+stl', 'blocks+steals', 'stocks', 'b+s']],
-  ['player_threes', ['3-pt made', '3pt made', '3-pointers made', '3pm', 'threes', '3s', '3-pt']],
+  ['player_threes', ['3-pt made', '3pt made', '3-pointers made', '3ptm', '3-ptm', '3pm', 'threes', '3s', '3-pt', '3pt']],
   ['player_points', ['points', 'pts']],
   ['player_rebounds', ['rebounds', 'rebs', 'reb']],
   ['player_assists', ['assists', 'asts', 'ast']],

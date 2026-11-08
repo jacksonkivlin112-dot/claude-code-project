@@ -2513,3 +2513,54 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 }
 .ds-day { white-space: nowrap; }
 @media (max-width: 860px) { .ds-day { min-width: 108px; } .ds-day small { font-size: 12px; } }
+
+/* ===== Bigger on phones ===================================================== */
+.mn-label { display: none; }
+@media (max-width: 860px) {
+  /* Bottom bar: bigger icons with a label under each. */
+  .mobile-nav { padding: 6px 4px; }
+  .mobile-nav a { height: 64px; display: flex; flex-direction: column; justify-content: center; gap: 3px; border-radius: 22px; }
+  .mobile-nav a svg { width: 27px; height: 27px; }
+  .mn-label { display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.01em; line-height: 1; white-space: nowrap; }
+  .mobile-nav a span.mn-label { font-size: 11px; }
+  .dock-search { width: 72px; height: 72px; }
+  .dock-search svg { width: 28px; height: 28px; }
+  .main, .footer { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 190px); }
+
+  /* Base text and controls a step larger. */
+  body { font-size: 15.5px; }
+  .small, .muted.small, small.muted { font-size: 13.5px; }
+  .hero-sub { font-size: 15.5px; }
+  .topbar-tools .icon-btn { width: 44px; height: 44px; }
+  .ai-hdr { height: 44px; font-size: 15px; padding: 0 16px; }
+  .menu-btn { width: 46px; height: 46px; }
+  .league-tabs a { font-size: 26px; }
+  .btn, .btn-ghost { font-size: 15.5px; min-height: 44px; padding-left: 16px; padding-right: 16px; }
+  .seg button { font-size: 14.5px; padding: 8px 13px; }
+  .toolbar select, .toolbar .search input { font-size: 16px; }
+  .cell-name { font-size: 16px; }
+  .cell-meta { font-size: 13px; }
+  .hs-head h2, .section-head h2 { font-size: 24px; }
+  .gs-grid .gs-rec strong { font-size: 32px; }
+  .gs-grid .gs-rec small { font-size: 14px; }
+  .gs-grid .gs-meta { font-size: 14px; }
+  .gs-grid .gs-meta strong { font-size: 18px; }
+  .gs-grid .gs-badge { width: 44px; height: 44px; }
+  .gs-grid .gs-badge img { width: 34px !important; height: 34px !important; }
+  .ds-day small { font-size: 13px; }
+  .ds-day strong { font-size: 26px; }
+  .lf-meta { font-size: 15px; }
+  .lf-after { font-size: 16px; }
+  .t-name { font-size: 17px; }
+  .t-mhead { font-size: 14px; }
+  .t-set { font-size: 18px; width: 22px; }
+  .slipc-pick, .gp-pick { font-size: 15px; }
+  .disclaimer { font-size: 12.5px; }
+  .perf-pill { font-size: 15px; bottom: calc(env(safe-area-inset-bottom, 0px) + 104px); }
+}
+@media (max-width: 380px) {
+  .mn-label { font-size: 10px; }
+  .mobile-nav a svg { width: 25px; height: 25px; }
+  .dock-search { width: 64px; height: 64px; }
+  .league-tabs a { font-size: 22px; }
+}

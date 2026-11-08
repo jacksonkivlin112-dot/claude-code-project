@@ -97,7 +97,7 @@ export const toolLabel = (name) => TOOL_LABEL[name] || name;
 
 // ---- helpers ----------------------------------------------------------------
 
-const findMarket = (cfg, stat) => {
+export const findMarket = (cfg, stat) => {
   const s = normName(stat || '');
   if (!s) return null;
   const alias = { pra: 'pointsreboundsassists', ptsrebast: 'pointsreboundsassists', pr: 'pointsrebounds', pa: 'pointsassists', ra: 'reboundsassists', '3pm': 'threes', threepointers: 'threes', '3pt': 'threes', recyds: 'receivingyards', recyards: 'receivingyards', rushrec: 'rushrecyards', rushrecyds: 'rushrecyards' };

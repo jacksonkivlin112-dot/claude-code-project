@@ -2478,7 +2478,7 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 
 /* ===== Games: sideways grid, 4 per column =================================== */
 .gs-grid {
-  display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 4), auto); grid-auto-columns: 330px; grid-template-columns: none;
+  display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 3), auto); grid-auto-columns: 330px; grid-template-columns: none;
   gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none;
   border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
 }
@@ -2501,7 +2501,7 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 .gs-grid .gs-meta strong { font-size: 17px; }
 .gs-grid .gs-card.post .gs-meta strong { color: var(--text-2); }
 .t-list {
-  display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 4), auto); grid-auto-columns: 340px;
+  display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 3), auto); grid-auto-columns: 340px;
   overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none; flex-direction: unset;
 }
 .t-list::-webkit-scrollbar { display: none; }

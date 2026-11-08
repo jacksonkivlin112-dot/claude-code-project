@@ -42,7 +42,7 @@ export const NBA_CFG = {
 };
 
 export function useNbaContext() {
-  const { season, dvp, b2b, liveById, gameByTeam, teams } = useData();
+  const { season, dvp, b2b, liveById, gameByTeam, teams, allGames } = useData();
   const rows = useNbaRows();
   const outlook = useNbaOutlook();
   const lineCal = useLineCalibration('nba');
@@ -58,8 +58,9 @@ export function useNbaContext() {
       liveById,
       gameByTeam,
       lineCal,
+      allGames,
     };
-  }, [rows, outlook, season, dvp, b2b, liveById, gameByTeam, teams, lineCal]);
+  }, [rows, outlook, season, dvp, b2b, liveById, gameByTeam, teams, lineCal, allGames]);
   return { ctx, rows };
 }
 

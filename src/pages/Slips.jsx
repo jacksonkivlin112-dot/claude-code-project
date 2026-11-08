@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { runOcr } from './Scan.jsx';
+import { parseSlipText } from '../slipParse.js';
+import { normName } from '../oddsapi.js';
 import { CFGS, OWN_HOOK, SPORT_LABEL, useDualSports } from '../dualSport.jsx';
-import { deleteSlip, loadSlips, onSlipsChange, storeResults } from '../slips.js';
+import { deleteSlip, loadSlips, onSlipsChange, saveSlip, storeResults } from '../slips.js';
 import { legStatus } from '../tracker.js';
 import { LegBar, useSlipAlerts } from '../components/Tracking.jsx';
 import { Avatar, Card, Empty, kickoff, timeAgo, useNow } from '../components/ui.jsx';
@@ -87,6 +90,7 @@ function SlipsPage({ home, own }) {
         </div>
       </div>
       {bridge}
+      <UploadSlip sports={sports} />
       {settled.length > 0 && (
         <div className="record-bar"><span>Your saved slips:</span><strong className={won ? 'pos-txt' : ''}>{won}-{settled.length - won}</strong><span className="muted">{active.length} still open</span></div>
       )}
@@ -154,5 +158,96 @@ function SlipCard({ v }) {
         ) : <button type="button" className="link small" onClick={() => setConfirm(true)}>Delete</button>}
       </footer>
     </article>
+  );
+}
+
+/** Upload a slip screenshot: read it on the device, check the legs, then track it here. */
+function UploadSlip({ sports }) {
+  const inputRef = useRef();
+  const [status, setStatus] = useState(null); // {phase, progress, done, ok}
+  const [legs, setLegs] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const ready = !!sports.nfl.ctx || !!sports.nba.ctx;
+
+  const roster = useMemo(() => [
+    ...(sports.nfl.rows || []).filter((r) => r.pos !== 'K' && r.pos !== 'DEF').map((r) => ({ ...r, sport: 'nfl' })),
+    ...(sports.nba.rows || []).map((r) => ({ ...r, sport: 'nba' })),
+  ], [sports.nfl.rows, sports.nba.rows]);
+  const bySport = (sp) => sports[sp];
+
+  // Turn parsed legs into trackable legs using each league's model (player id, team, game time, chance).
+  const resolve = (found) => found.map((l, i) => {
+    const sp = l.sport || roster.find((r) => normName(r.name) === normName(l.player))?.sport;
+    const S = sp && bySport(sp);
+    const cfg = sp && CFGS[sp];
+    if (!S?.ctx || !cfg || !l.market || l.line == null) return { ...l, sport: sp, problem: !l.market ? 'stat not read' : l.line == null ? 'line not read' : 'player not found' };
+    const e = cfg.evaluate({ id: `up:${i}`, player: l.player, market: l.market, line: Number(l.line) }, S.ctx);
+    if (!e || e.unmatched) return { ...l, sport: sp, problem: 'player not found' };
+    const g = S.ctx.gameByTeam?.[e.team];
+    return {
+      sport: sp, playerId: e.playerId, player: e.player, team: e.team, opp: e.opp, market: l.market, stat: cfg.markets[l.market].short,
+      line: Number(l.line), side: l.side || 'over', prob: (l.side || 'over') === 'under' ? e.pUnder : e.pOver,
+      gameTime: e.commence || g?.date || null, gameId: g?.id || null, week: S.ctx.week ?? null,
+    };
+  });
+
+  const onFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    setPreview(URL.createObjectURL(file));
+    setLegs(null);
+    setStatus({ phase: 'Reading your slip…', progress: 0 });
+    try {
+      const text = await runOcr(file, (pr) => setStatus({ phase: 'Reading your slip…', progress: pr }));
+      const found = parseSlipText(text, roster, (pl) => CFGS[pl.sport]?.aliases);
+      const out = resolve(found);
+      setLegs(out);
+      const good = out.filter((l) => !l.problem).length;
+      setStatus({ phase: good ? `Found ${good} pick${good === 1 ? '' : 's'}${out.length > good ? ` (${out.length - good} couldn’t be matched)` : ''}` : 'Couldn’t find any picks in that image.', done: true, ok: good > 0 });
+    } catch (e) {
+      setStatus({ phase: `Couldn’t read the image (${e.message}).`, done: true, ok: false });
+    }
+  };
+
+  const good = (legs || []).filter((l) => !l.problem);
+  const track = () => {
+    saveSlip({ title: `${good.length}-pick slip (uploaded)`, source: 'upload', legs: good });
+    setLegs(null); setStatus({ phase: `Tracking ${good.length} picks ✓`, done: true, ok: true }); setPreview(null);
+  };
+  const toScan = () => {
+    try { localStorage.setItem('ge:scan:prefill', JSON.stringify((legs || []).map((l) => ({ sport: l.sport, player: l.player, market: l.market, line: l.line, side: l.side || 'over' })))); } catch { /* ignore */ }
+    window.location.hash = `/${legs?.[0]?.sport === 'nba' ? 'nba/' : ''}scan`;
+  };
+
+  return (
+    <section className={`up-slip ${legs ? 'open' : ''}`}>
+      <div className="up-row">
+        {preview ? <img className="up-thumb" src={preview} alt="Your slip" /> : <span className="up-ico" aria-hidden>📷</span>}
+        <div className="up-text">
+          <strong>Upload a slip to track it</strong>
+          <small>{status ? status.phase : 'Screenshot from PrizePicks or any app. It’s read on your phone and never uploaded anywhere.'}</small>
+          {status && !status.done && <span className="lbar pace"><span className="lbar-fill" style={{ width: `${Math.round((status.progress || 0) * 100)}%` }} /></span>}
+        </div>
+        <button type="button" className="btn" disabled={!ready || (status && !status.done)} onClick={() => inputRef.current?.click()}>{ready ? (legs ? 'Another' : 'Upload') : 'Loading…'}</button>
+        <input ref={inputRef} type="file" accept="image/*" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ''; }} />
+      </div>
+      {legs && legs.length > 0 && (
+        <>
+          <ol className="up-legs">
+            {legs.map((l, i) => (
+              <li key={i} className={l.problem ? 'bad' : ''}>
+                <span><b>{l.player}</b><small>{l.problem ? `Skipped: ${l.problem}` : `${l.side === 'under' ? 'Less' : 'More'} ${l.line} ${l.stat} · ${SPORT_LABEL[l.sport]} · ${l.team}${l.opp ? ` vs ${l.opp}` : ''}`}</small></span>
+                {!l.problem && <em>{Math.round(l.prob * 100)}%</em>}
+                <button type="button" className="up-x" onClick={() => setLegs((xs) => xs.filter((_, k) => k !== i))} aria-label={`Remove ${l.player}`}>✕</button>
+              </li>
+            ))}
+          </ol>
+          <div className="up-actions">
+            <button type="button" className="btn" disabled={!good.length} onClick={track}>Track {good.length} pick{good.length === 1 ? '' : 's'}</button>
+            <button type="button" className="btn-ghost" onClick={toScan}>Fix in Slip Scan</button>
+            <button type="button" className="link small" onClick={() => { setLegs(null); setStatus(null); setPreview(null); }}>Cancel</button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }

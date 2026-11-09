@@ -3,6 +3,7 @@ import { DataProvider, useData, useRoute } from './data.jsx';
 import { Overlay } from './components/panels.jsx';
 import { Header, MobileNav, Ticker } from './components/shell.jsx';
 import AiLauncher from './ai/Launcher.jsx';
+import HypeHost from './ai/HypeHost.jsx';
 import { UiProvider, timeAgo, useNow } from './components/ui.jsx';
 import Game from './pages/Game.jsx';
 import Home from './pages/Home.jsx';
@@ -98,6 +99,7 @@ function Shell({ route, sport }) {
       </footer>
       <MobileNav route={route} />
       <AiLauncher sport={route.sport} />
+      <HypeHost />
       <Overlay {...sport.panels} />
     </>
   );

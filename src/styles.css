@@ -2577,3 +2577,64 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 .up-leg-edit em { font-style: normal; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
 .up-legs li.odd .up-line { border-color: var(--warn); }
 .up-warn { color: var(--warn); font-weight: 700; font-size: 13px; }
+
+/* ---- Entries (PrizePicks-style slip tracker) ---- */
+.ent-tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--border); margin: 4px 0 14px; }
+.ent-tabs button { background: none; border: 0; color: var(--muted); font-size: 18px; font-weight: 700; padding: 10px 2px 12px; position: relative; cursor: pointer; }
+.ent-tabs button.on { color: var(--text); }
+.ent-tabs button.on::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; border-radius: 3px; background: var(--text); }
+.ent-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.ent-tiles > div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.ent-tiles b { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.ent-tiles span { color: var(--muted); font-size: 13px; }
+.ent-sec { display: flex; flex-direction: column; gap: 12px; margin: 14px 0; }
+.ent-sec h3 { font-size: 20px; font-weight: 800; margin: 6px 0 0; }
+.ent-card { text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px; color: var(--text); cursor: pointer; font: inherit; }
+.ent-card:active { transform: scale(0.99); }
+.ent-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ent-top strong { display: block; font-size: 17px; font-weight: 800; }
+.ent-top small { color: var(--muted); font-size: 13px; }
+.ent-result { font-size: 16px; white-space: nowrap; }
+.ent-mid { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.ent-faces { display: flex; gap: 6px; flex-wrap: wrap; }
+.ent-face { position: relative; display: inline-grid; border-radius: 50%; padding: 2px; border: 2px solid var(--border); }
+.ent-face.hit { border-color: var(--pos, #22c55e); }
+.ent-face.miss { border-color: var(--neg, #ef4444); }
+.ent-face.live { border-color: var(--text); }
+.ent-face i { position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 900; color: #fff; background: #6b7280; border: 2px solid var(--surface); }
+.ent-face.hit i { background: #22c55e; }
+.ent-face.miss i { background: #ef4444; }
+.ent-face.big i { width: 24px; height: 24px; font-size: 14px; }
+.ent-status { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; white-space: nowrap; color: var(--muted); }
+.ent-names { color: var(--muted); font-size: 13px; }
+.ent-sheet { position: fixed; inset: 0; z-index: 80; background: var(--bg); }
+.ent-sheet-scroll { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.ent-sheet-head { position: sticky; top: 0; z-index: 2; background: var(--bg); display: flex; align-items: center; gap: 12px; padding: calc(12px + env(safe-area-inset-top)) 0 12px; }
+.ent-sheet-head strong { display: block; font-size: 19px; font-weight: 800; }
+.ent-sheet-head small { color: var(--muted); font-size: 14px; }
+.ent-leg { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; }
+.ent-leg-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface-2); font-size: 13px; color: var(--muted); }
+.ent-lg { font-weight: 800; color: var(--text); }
+.ent-match { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ent-match b { color: var(--text); }
+.ent-match i { font-style: normal; opacity: 0.7; margin: 0 2px; }
+.ent-clock { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.ent-leg-body { display: flex; align-items: center; gap: 12px; padding: 14px 14px 8px; }
+.ent-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ent-who b { font-size: 17px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ent-who small { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 13px; }
+.ent-line { border: 1px solid var(--border); background: var(--surface-2); border-radius: 12px; padding: 8px 12px; display: flex; flex-direction: column; align-items: center; min-width: 84px; }
+.ent-line b { font-size: 18px; font-weight: 800; }
+.ent-line small { color: var(--muted); font-size: 12px; text-align: center; }
+.ent-bar { position: relative; height: 8px; margin: 20px 16px 18px; border-radius: 8px; background: var(--surface-2); }
+.ent-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px; background: var(--text); transition: width 0.4s; }
+.ent-leg.hit .ent-bar-fill { background: #22c55e; }
+.ent-leg.miss .ent-bar-fill { background: #ef4444; }
+.ent-leg.push .ent-bar-fill { background: #9ca3af; }
+.ent-bubble { position: absolute; top: 50%; transform: translate(-50%, -50%); min-width: 34px; padding: 3px 8px; border-radius: 999px; background: var(--text); color: var(--bg); font-weight: 800; font-size: 13px; text-align: center; }
+.ent-leg.hit .ent-bubble { background: #22c55e; color: #fff; }
+.ent-leg.miss .ent-bubble { background: #ef4444; color: #fff; }
+.ent-sheet-foot { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.ent-del { display: flex; align-items: center; gap: 8px; }
+.ent-sheet-scroll > * { flex-shrink: 0; }
+.ent-sec h3 { text-transform: none; letter-spacing: -0.01em; color: var(--text); font-family: inherit; }

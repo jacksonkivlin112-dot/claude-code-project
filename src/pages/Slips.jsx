@@ -38,7 +38,7 @@ function SlipsPage({ params }) {
         <div>
           <p className="eyebrow">Tracking</p>
           <h1>My slips</h1>
-          <p className="hero-sub">Every slip you save from Props, the Parlay Builder or Slip Scan, followed leg by leg with live stats. Results stay here after the games end.</p>
+          <p className="hero-sub">Every slip you save from the Parlay Builder or Slip Scan, or upload, followed leg by leg with live stats. Results stay here after the games end.</p>
         </div>
         <div className="props-status">
           {perm === 'granted' ? <span className="source-pill"><span className="live-dot" /> Alerts on</span>
@@ -61,7 +61,7 @@ function SlipsPage({ params }) {
           <Bankroll view={view} />
           <UploadSlip sports={sports} />
           {active.length === 0 ? (
-            <Card><Empty title="No open entries">Upload a slip screenshot above, or tap <strong>☆ Save slip & track live</strong> on a slip in Props or the Parlay Builder.</Empty></Card>
+            <Card><Empty title="No open entries">Upload a slip screenshot above, or tap <strong>☆ Save slip & track live</strong> on a slip in the Parlay Builder.</Empty></Card>
           ) : (
             <>
               {[['Live', active.filter((v) => v.sts.some((x) => x.state === 'live') || v.st.hit || v.st.miss)], ['Upcoming', active.filter((v) => !(v.sts.some((x) => x.state === 'live') || v.st.hit || v.st.miss))]].map(([label, list]) => list.length > 0 && (

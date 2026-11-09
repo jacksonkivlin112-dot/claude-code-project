@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { TeamLogo } from '../components/ui.jsx';
 import { runOcr } from './Scan.jsx';
 import { parseSlipText, repairLine } from '../slipParse.js';
 import { buildRoster, nextGame } from '../slipRoster.js';
@@ -80,6 +82,9 @@ function SlipsPage({ home, own }) {
   // A slip is finished once every leg is decided (a Flex slip can still pay after a miss).
   const active = view.filter((v) => v.st.open > 0);
   const settled = view.filter((v) => v.st.open === 0).sort((a, b) => lastGame(b.slip) - lastGame(a.slip));
+  const [tab, setTab] = useState('open');
+  const [openId, setOpenId] = useState(null);
+  const openView = view.find((v) => v.slip.id === openId) || null;
 
   return (
     <div className="page">
@@ -97,19 +102,37 @@ function SlipsPage({ home, own }) {
         </div>
       </div>
       {bridge}
-      {settled.length > 0 && <BetRecord settled={settled} openCount={active.length} />}
-      <UploadSlip sports={sports} />
-      {view.length === 0 ? (
-        <Card>
-          <Empty title="No saved slips yet">
-            Tap <strong>☆ Save slip & track live</strong> on a slip in Props, the Parlay Builder or Slip Scan. It shows up here with each leg’s live stats as the games play.
-          </Empty>
-        </Card>
+      <nav className="ent-tabs">
+        <button type="button" className={tab === 'open' ? 'on' : ''} onClick={() => setTab('open')}>Open</button>
+        <button type="button" className={tab === 'past' ? 'on' : ''} onClick={() => setTab('past')}>Past</button>
+      </nav>
+      {tab === 'open' ? (
+        <>
+          <div className="ent-tiles">
+            <div><b>{active.length}</b><span>{active.length === 1 ? 'Entry' : 'Entries'} open</span></div>
+            <div><b>{money(active.reduce((a, v) => a + (toWin(v.slip) || 0), 0))}</b><span>Potential winnings</span></div>
+          </div>
+          <UploadSlip sports={sports} />
+          {active.length === 0 ? (
+            <Card><Empty title="No open entries">Upload a slip screenshot above, or tap <strong>☆ Save slip & track live</strong> on a slip in Props or the Parlay Builder.</Empty></Card>
+          ) : (
+            <>
+              {[['Live', active.filter((v) => v.sts.some((x) => x.state === 'live') || v.st.hit || v.st.miss)], ['Upcoming', active.filter((v) => !(v.sts.some((x) => x.state === 'live') || v.st.hit || v.st.miss))]].map(([label, list]) => list.length > 0 && (
+                <section key={label} className="ent-sec">
+                  <h3>{label}</h3>
+                  {list.map((v) => <EntryCard key={v.slip.id} v={v} onOpen={() => setOpenId(v.slip.id)} />)}
+                </section>
+              ))}
+            </>
+          )}
+        </>
       ) : (
-        <div className="slips">
-          {[...active, ...settled].map((v) => <SlipCard key={v.slip.id} v={v} />)}
-        </div>
+        <>
+          {settled.length > 0 ? <BetRecord settled={settled} openCount={active.length} /> : <Card><Empty title="No finished entries yet">Entries move here once every pick is decided.</Empty></Card>}
+          <section className="ent-sec">{settled.map((v) => <EntryCard key={v.slip.id} v={v} onOpen={() => setOpenId(v.slip.id)} />)}</section>
+        </>
       )}
+      {openView && <EntrySheet v={openView} sports={sports} onClose={() => setOpenId(null)} />}
       <p className="disclaimer">Slips are stored on this device. Live stats refresh about every minute while games are on. Alerts fire while the app is open (or running in the background where your phone allows it).</p>
     </div>
   );
@@ -419,5 +442,139 @@ function BetLine({ v }) {
       {settled ? <strong className={settled.profit > 0 ? 'pos-txt' : settled.profit < 0 ? 'neg-txt' : ''}>{settled.refunded ? 'Refunded' : money(settled.profit, true)}</strong> : <small className="muted">pending</small>}
       <button type="button" className="link small" onClick={() => setEdit(true)}>Edit</button>
     </div>
+  );
+}
+
+// ---- Entries (list + detail) ----------------------------------------------------
+
+const playText = (slip) => `${slip.legs.length}-Pick ${slip.bet?.mode === 'flex' ? 'Flex' : 'Power'} Play`;
+/** What the entry pays if it all hits (Power) or the top Flex payout. */
+function toWin(slip) {
+  const b = slip.bet;
+  if (!b) return null;
+  const n = slip.legs.length;
+  const mult = b.mode === 'flex' ? PAYOUTS.flex[n]?.[n] : (b.mult || defaultMult(n));
+  return mult ? Math.round(b.stake * mult * 100) / 100 : null;
+}
+const legTone = (s) => (s.state === 'final' ? (s.push ? 'push' : s.hit ? 'hit' : 'miss') : s.state === 'void' ? 'push' : s.state);
+const shortName = (n) => { const p = n.split(' '); return p.length > 1 ? `${p[0][0]}. ${p.slice(1).join(' ')}` : n; };
+
+function EntryCard({ v, onOpen }) {
+  const { slip, sts, st, settled } = v;
+  const live = sts.some((x) => x.state === 'live');
+  const win = toWin(slip);
+  return (
+    <button type="button" className={`ent-card ${st.key}`} onClick={onOpen}>
+      <div className="ent-top">
+        <div>
+          <strong>{slip.bet ? `${money(slip.bet.stake)} to win ${money(win || 0)}` : slip.title}</strong>
+          <small>{slip.bet ? playText(slip) : `${slip.legs.length} picks · add a bet amount to track profit`}</small>
+        </div>
+        {settled ? <b className={`ent-result ${settled.profit > 0 ? 'pos-txt' : settled.profit < 0 ? 'neg-txt' : ''}`}>{settled.refunded ? 'Refunded' : money(settled.profit, true)}</b>
+          : st.open === 0 ? <b className={`ent-result ${st.key === 'won' ? 'pos-txt' : 'neg-txt'}`}>{st.key === 'won' ? 'Won' : 'Lost'}</b> : null}
+      </div>
+      <div className="ent-mid">
+        <span className="ent-faces">
+          {slip.legs.map((l, i) => {
+            const nm = l.player.split(' ');
+            return (
+              <span key={i} className={`ent-face ${legTone(sts[i])}`}>
+                <Avatar player={{ id: l.playerId, sport: l.sport, team: l.team, first: nm[0], last: nm.slice(-1)[0] }} size={46} />
+                {sts[i].state === 'final' && <i>{sts[i].push ? '–' : sts[i].hit ? '✓' : '✕'}</i>}
+              </span>
+            );
+          })}
+        </span>
+        <span className="ent-status">{live ? <><span className="live-dot" /> Live</> : st.open === 0 ? (st.key === 'won' ? '✓ Won' : '✕ Lost') : (() => { const t = Math.min(...slip.legs.filter((l, i) => sts[i].state !== 'final' && sts[i].state !== 'void').map((l) => new Date(l.gameTime || 8.64e15).getTime())); return t < 8e15 ? kickoff(new Date(t).toISOString()) : 'Upcoming'; })()}</span>
+      </div>
+      <small className="ent-names">{slip.legs.map((l) => shortName(l.player)).join(', ')}</small>
+    </button>
+  );
+}
+
+/** Game header for a pick: league, matchup with scores, and Final / live clock / start time. */
+function legGame(leg, sports) {
+  const S = sports[leg.sport];
+  const g = S?.ctx?.gameByTeam?.[leg.team];
+  if (!g || (leg.gameTime && Math.abs(new Date(g.date) - new Date(leg.gameTime)) > 12 * 3600e3)) return null;
+  return g;
+}
+
+function EntrySheet({ v, sports, onClose }) {
+  const { slip, sts, st, settled } = v;
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => {
+    window.history.pushState({ geEntry: true }, '');
+    const onPop = () => onClose();
+    window.addEventListener('popstate', onPop);
+    document.body.classList.add('no-scroll');
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      document.body.classList.remove('no-scroll');
+      if (window.history.state?.geEntry) window.history.back();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const win = toWin(slip);
+  return createPortal(
+    <div className="ent-sheet" role="dialog" aria-modal="true">
+      <div className="ent-sheet-scroll">
+        <header className="ent-sheet-head">
+          <button type="button" className="pp-round" onClick={onClose} aria-label="Back">‹</button>
+          <div>
+            <strong>{slip.bet ? `${money(slip.bet.stake)} to win ${money(win || 0)}` : slip.title}</strong>
+            <small>{slip.bet ? playText(slip) : `${slip.legs.length}-pick slip`}{settled ? ` · ${settled.refunded ? 'Refunded' : money(settled.profit, true)}` : st.open === 0 ? ` · ${st.key === 'won' ? 'Won' : 'Lost'}` : ''}</small>
+          </div>
+        </header>
+        {slip.legs.map((l, i) => {
+          const s = sts[i];
+          const g = legGame(l, sports);
+          const S = sports[l.sport];
+          const sp = S?.ctx?.season?.players?.get(l.playerId);
+          const pos = sp?.pos || null;
+          const nm = l.player.split(' ');
+          const actual = s.actual ?? (s.state === 'final' ? 0 : null);
+          const fill = actual == null ? 0 : Math.max(0, Math.min(1, actual / Math.max(l.line, 0.5)));
+          const tone = legTone(s);
+          return (
+            <article key={i} className={`ent-leg ${tone}`}>
+              <div className="ent-leg-head">
+                <span className="ent-lg">{SPORT_LABEL[l.sport] || l.sport.toUpperCase()}</span>
+                <span className="ent-match">{g ? <>{g.away.abbr} {g.state !== 'pre' ? <b>{g.away.score}</b> : null} <i>vs</i> {g.home.abbr} {g.state !== 'pre' ? <b>{g.home.score}</b> : null}</> : <>{l.team}{l.opp ? <> <i>vs</i> {l.opp}</> : null}</>}</span>
+                <span className="ent-clock">{g?.state === 'in' ? <><span className="live-dot" /> {g.detail}</> : g?.state === 'post' || s.state === 'final' ? 'Final' : s.state === 'void' ? 'Void' : l.gameTime ? kickoff(l.gameTime) : ''}</span>
+              </div>
+              <div className="ent-leg-body">
+                <span className={`ent-face big ${tone}`}>
+                  <Avatar player={{ id: l.playerId, sport: l.sport, team: l.team, first: nm[0], last: nm.slice(-1)[0] }} size={64} />
+                  {s.state === 'final' && <i>{s.push ? '–' : s.hit ? '✓' : '✕'}</i>}
+                </span>
+                <span className="ent-who">
+                  <b>{l.player}</b>
+                  <small><TeamLogo abbr={l.team} size={16} /> {[l.team, pos].filter(Boolean).join(' • ')}</small>
+                </span>
+                <span className="ent-line">
+                  <b>{l.side === 'under' ? '↓' : '↑'} {l.line}</b>
+                  <small>{l.stat}</small>
+                </span>
+              </div>
+              <div className="ent-bar">
+                <span className="ent-bar-fill" style={{ width: `${fill * 100}%` }} />
+                {actual != null && <span className="ent-bubble" style={{ left: `clamp(22px, ${fill * 100}%, calc(100% - 22px))` }}>{fmtVal(actual)}</span>}
+              </div>
+            </article>
+          );
+        })}
+        <div className="ent-sheet-foot">
+          <BetLine v={v} />
+          {confirm ? (
+            <div className="ent-del">
+              <span className="muted small">Delete this entry?</span>
+              <button type="button" className="btn-ghost" onClick={() => setConfirm(false)}>Keep</button>
+              <button type="button" className="btn-ghost danger" onClick={() => { deleteSlip(slip.id); onClose(); }}>Delete</button>
+            </div>
+          ) : <button type="button" className="link small" onClick={() => setConfirm(true)}>Delete entry</button>}
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

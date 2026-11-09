@@ -283,13 +283,6 @@ function PropsBody({ ctx, rows, P }) {
           {P.lines.length > 0 && (
             <>
               <LineCalNote cal={ctx?.lineCal} none={best.length === 0} />
-              {best.length > 0 && (
-                <section>
-                  <div className="section-head"><h2>Best plays</h2><span className="muted small">Highest model confidence among open lines</span></div>
-                  <div className="best-grid">{best.map((e) => <BestCard key={e.id} e={e} />)}</div>
-                </section>
-              )}
-
               {best.length >= 2 && (
                 <SlipBuilder
                   title="Safest slip from today’s lines"
@@ -425,30 +418,6 @@ function HitDots({ recent, line }) {
         <span key={h.week} className={`hd ${h.push ? 'push' : h.over ? 'over' : 'under'}`} title={`${h.label || `Wk ${h.week} vs ${h.opp}`}: ${f1(h.val)} (${h.push ? 'push' : h.over ? 'over' : 'under'} ${line})`} />
       ))}
     </span>
-  );
-}
-
-function BestCard({ e }) {
-  const { openPlayer } = useUi();
-  return (
-    <button type="button" className={`best-card ${e.side}`} onClick={() => e.playerId && openPlayer(e.playerId)}>
-      <div className="best-top">
-        <Avatar player={{ id: e.playerId || '0', sport: e.sport, pos: e.pos, team: e.team, first: e.player.split(' ')[0], last: e.player.split(' ').slice(-1)[0] }} size={40} />
-        <div className="best-name">
-          <strong>{e.player}</strong>
-          <span className="muted">{e.team} {e.opp ? `vs ${e.opp}` : ''}</span>
-        </div>
-        <PickBadge e={e} size="sm" />
-      </div>
-      <div className="best-line">
-        <span className="best-market">{e.marketLabel}</span>
-        <LineValue e={e} />
-      </div>
-      <div className="best-foot">
-        <span>Model {f1(e.mean)}</span>
-        <span className={`grade-txt g-${e.grade.key}`}>{e.grade.label}</span>
-      </div>
-    </button>
   );
 }
 

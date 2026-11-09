@@ -21,6 +21,7 @@ const NBA_NAV = [
 const TENNIS_NAV = [
   { path: 'home', label: 'Matches', short: 'Matches', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8' },
   { path: 'picks', label: 'Picks & Parlays', short: 'Picks', icon: 'M4 6h11M4 12h8M4 18h11M18 5l3 3-3 3M18 13l3 3-3 3' },
+  { path: 'bets', label: 'Betting Picks', short: 'Bets', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
   { path: 'rankings', label: 'Rankings', icon: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4' },
   { path: 'record', label: 'Model Record', short: 'Record', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
 ];

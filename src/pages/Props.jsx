@@ -365,7 +365,7 @@ function LineCalNote({ cal, none }) {
       <span className="fold">
         {cal.usingDefault
           ? `Sportsbook lines are sharp, so the app trusts only ${pct(cal.s)} of the model’s lean until at least 300 graded ${cfg.sport.toUpperCase()} lines show it beats the line (${cal.n} graded so far).`
-          : `Checked on ${cal.n.toLocaleString()} graded ${cfg.sport.toUpperCase()} lines: when the model was 70%+ sure, its side hit ${cal.modelSide70 ? pct(cal.modelSide70.hit) : '—'}. So the app trusts ${pct(cal.s)} of its lean${cal.b ? ` and adjusts for overs hitting ${pct(cal.overRate)}` : ''}.`}
+          : `Checked on ${cal.n.toLocaleString()} graded ${cfg.sport.toUpperCase()} lines: when the model was 70%+ sure, its side hit ${cal.modelSide70 ? pct(cal.modelSide70.hit) : '—'}. ${cal.markets && Object.keys(cal.markets).length ? ` Trust is set per stat: ${Object.entries(cal.markets).sort((x, y) => y[1].s - x[1].s).slice(0, 3).map(([m, v]) => `${cfg.markets[m]?.short || m} ${pct(v.s)}`).join(', ')}, and stats it projects too high get an under adjustment.` : ` So the app trusts ${pct(cal.s)} of its lean${cal.b ? ` and adjusts for overs hitting ${pct(cal.overRate)}` : ''}.`}`}
         {none && ' Picks show up here automatically if the record improves. Meanwhile, the Highest-chance props below are calibrated separately and have held up in testing.'}
         {' '}This updates every night.
       </span>

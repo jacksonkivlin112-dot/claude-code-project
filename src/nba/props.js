@@ -115,7 +115,8 @@ export function evaluateNbaProp(prop, ctx) {
     sd = Math.max(sd, 0.12 * mean, 1);
   }
   const p = calibrateLine(probabilities(dist, mean, sd, prop.line), prop, ctx.lineCal);
-  const side = p.over >= p.under ? 'over' : 'under';
+  // When calibration squeezes a line to a dead 50/50, keep the model's own lean for the side.
+  const side = Math.abs(p.over - p.under) > 1e-9 ? (p.over > p.under ? 'over' : 'under') : ((p.rawOver ?? p.over) >= (p.rawUnder ?? p.under) ? 'over' : 'under');
   const prob = Math.max(p.over, p.under);
   let grade = GRADES.find((g) => prob >= g.min);
   if (inactive || (n < 2 && projVal == null)) grade = GRADES[3];

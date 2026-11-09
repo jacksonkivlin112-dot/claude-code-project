@@ -4,6 +4,7 @@ import { Overlay } from './components/panels.jsx';
 import { Header, MobileNav, Ticker } from './components/shell.jsx';
 import AiLauncher from './ai/Launcher.jsx';
 import HypeHost from './ai/HypeHost.jsx';
+import { LiveEntryBar, SlipsHub } from './slipsLive.jsx';
 import { UiProvider, timeAgo, useNow } from './components/ui.jsx';
 import Game from './pages/Game.jsx';
 import Home from './pages/Home.jsx';
@@ -75,8 +76,9 @@ function Shell({ route, sport }) {
   useEffect(() => { document.documentElement.dataset.sport = route.sport; }, [route.sport]);
   const Page = sport.pages[route.path] || sport.pages.home;
   return (
-    <>
+    <SlipsHub route={route}>
       <Header route={route} />
+      <LiveEntryBar route={route} />
       {/* Home has its own swipeable game cards; game pages go full screen. */}
       {route.path !== 'game' && route.path !== 'home' && route.sport !== 'tennis' && <Ticker />}
       <main className="main">
@@ -101,7 +103,7 @@ function Shell({ route, sport }) {
       <AiLauncher sport={route.sport} />
       <HypeHost />
       <Overlay {...sport.panels} />
-    </>
+    </SlipsHub>
   );
 }
 

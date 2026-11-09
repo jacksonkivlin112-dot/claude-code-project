@@ -25,6 +25,13 @@ const LINES = {
     (e) => `Tough one — ${last(e.player)} fell short (${e.actual}). Process was right, variance happens`,
     (e) => `${last(e.player)} fumbled the bag 💀 ${e.actual} ${e.stat}. On to the next`,
   ],
+  push: [
+    (e) => `${last(e.player)} landed exactly on ${e.line} ➖ push, that leg's off the board`,
+  ],
+  injury: [
+    (e) => `⚠️ Heads up bro — ${e.player} is ${e.status}${e.part ? ` (${e.part})` : ''}. Check your ${e.side} ${e.line} ${e.stat} before lock`,
+    (e) => `🚑 ${e.player} listed ${e.status}. If he sits, that leg usually gets voided — keep an eye on it`,
+  ],
   won: [
     (e) => `🏆 SLIP CASHED BRO${e.payout ? ` — ${e.payout} payday` : ''}! Fire picks all day 🔥🔥🔥`,
     (e) => `YOU HIT THE ${e.legs}-PICK 💰${e.payout ? ` ${e.payout} secured` : ''}. Screenshot that`,
@@ -52,6 +59,7 @@ export async function aiHype(e) {
   let key = '';
   try { key = localStorage.getItem('ge:ai:key') || ''; } catch { /* ignore */ }
   if (!key) return null;
+  if (e.kind === 'injury' || e.kind === 'push') return null;
   const what = e.kind === 'won' ? `Their whole ${e.legs}-pick slip "${e.title}" just won${e.payout ? `, paying ${e.payout}` : ''}.`
     : e.kind === 'lost' ? `Their ${e.legs}-pick slip "${e.title}" just lost with ${e.hits}/${e.legs} legs hitting.`
     : `${e.player} (${e.side} ${e.line} ${e.stat}) just ${e.kind === 'hit' ? 'HIT' : 'missed'} with ${e.actual}.`;

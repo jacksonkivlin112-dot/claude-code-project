@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Logo from './Logo.jsx';
+import SearchSheet from './SearchSheet.jsx';
 import { useData } from '../data.jsx';
 import { FORMATS } from '../model.js';
 import { Segmented, TeamLogo, kickoff, timeAgo, useNow, useUi } from './ui.jsx';
@@ -249,6 +250,7 @@ const DOCK = ['home', 'props', 'parlays', 'scan', 'slips'];
 
 /** Floating rounded bottom bar with the main sections, plus a separate search button. */
 export function MobileNav({ route }) {
+  const [search, setSearch] = useState(false);
   const items = route.sport === 'tennis' ? navFor('tennis') : route.sport === 'cfb' ? navFor('cfb').filter((n) => !n.menuOnly && n.path !== 'teams') : navFor(route.sport).filter((n) => DOCK.includes(n.path)).sort((a, b) => DOCK.indexOf(a.path) - DOCK.indexOf(b.path));
   return (
     <div className="dock">
@@ -260,14 +262,10 @@ export function MobileNav({ route }) {
           </a>
         ))}
       </nav>
-      <a
-        className="dock-search"
-        href={href(route.sport, route.sport === 'tennis' ? 'rankings' : 'props')}
-        aria-label="Search players"
-        onClick={() => { try { sessionStorage.setItem('ge:focusSearch', '1'); } catch { /* ignore */ } }}
-      >
+      <button type="button" className="dock-search" aria-label="Search players" onClick={() => setSearch(true)}>
         <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4" size={28} />
-      </a>
+      </button>
+      {search && <SearchSheet sport={route.sport} onClose={() => setSearch(false)} />}
     </div>
   );
 }

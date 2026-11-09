@@ -212,7 +212,7 @@ function PropsBody({ ctx, rows, P }) {
 
   const [market, setMarket] = useState('ALL');
   const [side, setSide] = useState('ALL');
-  const [minGrade, setMinGrade] = useState('solid');
+  const [minGradePick, setMinGrade] = useState(null);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('prob');
   const [showSettings, setShowSettings] = useState(false);
@@ -226,6 +226,9 @@ function PropsBody({ ctx, rows, P }) {
     return exists ? 'updated' : 'added';
   };
 
+  // Default to edges only, but when nothing clears the bar show every line instead of an empty list.
+  const anyEdge = (evaluated || []).some((e) => !e.started && !e.unmatched && e.grade.key !== 'pass');
+  const minGrade = minGradePick ?? (anyEdge ? 'solid' : 'pass');
   const marketsPresent = useMemo(() => [...new Set((evaluated || []).map((e) => e.market))], [evaluated]);
 
   const filtered = useMemo(() => {

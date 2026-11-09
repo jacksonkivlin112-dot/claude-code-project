@@ -28,6 +28,7 @@ import TennisHome from './tennis/pages/Home.jsx';
 import TennisMatch from './tennis/pages/Match.jsx';
 import TennisPicks from './tennis/pages/Picks.jsx';
 import TennisBets from './tennis/pages/Bets.jsx';
+import TennisProps from './tennis/pages/Props.jsx';
 import TennisRankings from './tennis/pages/Rankings.jsx';
 import TennisRecord from './tennis/pages/Record.jsx';
 import NbaGame from './nba/pages/Game.jsx';
@@ -64,7 +65,7 @@ const SPORTS = {
   },
   tennis: {
     Provider: TennisDataProvider,
-    pages: { home: TennisHome, match: TennisMatch, picks: TennisPicks, bets: TennisBets, rankings: TennisRankings, record: TennisRecord },
+    pages: { home: TennisHome, match: TennisMatch, picks: TennisPicks, props: TennisProps, bets: TennisBets, rankings: TennisRankings, record: TennisRecord },
     panels: { PlayerPanelC: TennisPlayerPanel, TeamPanelC: TennisPlayerPanel },
     credit: 'Scores, draws & rankings via ESPN · Player ratings built from every result since last season',
     footer: () => 'Tennis data refreshes daily, live scores every 30 seconds',

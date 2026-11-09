@@ -30,7 +30,7 @@ export const NFL_CFG = {
   boardMinProj: 0.5,
   safeMinProj: 5,
   period: 'week',
-  title: 'Player Props · Over / Under',
+  title: 'NFL Props',
   example: 'Josh Allen, Pass Yards, 245.5\nBijan Robinson Rush Yds 82.5\nPuka Nacua, Receptions, 6.5',
   searchHint: 'Search any player or team (e.g. Josh Allen, Bijan, KC)',
   keyMarkets: {
@@ -256,7 +256,7 @@ function PropsBody({ ctx, rows, P }) {
           <h1>{cfg.title}</h1>
           {cfg.HeaderExtra && <cfg.HeaderExtra />}
           <p className="hero-sub">
-            Each line is run through our model: projection, season and recent form, opponent matchup, game script and injuries. The result is a hit probability for the over and the under. Lines are real: DraftKings player props (free, via ESPN) plus PrizePicks when connected. Picks need to clear ~{Math.round(BREAKEVEN * 1000) / 10}% to count as an edge (PrizePicks’ per-leg break-even, about the same as a −118 bet at a sportsbook).
+            The model’s highest-chance More lines for every player, a safest-slip builder, and every player’s projection. Search anyone and type the line from your app to get More or Less with a chance, built from projection, recent form, matchup, game script and injuries.
           </p>
         </div>
         <div className="props-status">
@@ -280,63 +280,11 @@ function PropsBody({ ctx, rows, P }) {
         <Card><SkeletonRows n={6} h={64} /></Card>
       ) : (
         <>
-          {P.lines.length > 0 && (
-            <>
-              <LineCalNote cal={ctx?.lineCal} none={best.length === 0} />
-              {best.length >= 2 && (
-                <SlipBuilder
-                  title="Safest slip from today’s lines"
-                  subtitle="Highest-probability picks from the loaded lines, one per game"
-                  picks={open.filter((e) => e.grade.key === 'strong' || e.grade.key === 'solid').map((e) => ({ key: e.id, sport: cfg.sport, playerId: e.playerId, player: e.player, pos: e.pos, team: e.team, opp: e.opp, game: e.team && e.opp ? [e.team, e.opp].sort().join('-') : e.id, side: e.side, line: e.line, market: e.market, stat: e.marketShort, prob: e.prob, gameTime: e.commence || ctx.gameByTeam[e.team]?.date, gameId: ctx.gameByTeam[e.team]?.id, week: ctx.week }))}
-                />
-              )}
-
-              {graded.length > 0 && (
-                <div className="record-bar">
-                  <span>Model record this {cfg.period} (graded picks):</span>
-                  <a className="link" href={`#/${cfg.sport !== 'nfl' ? `${cfg.sport}/` : ''}record`}>Full record →</a>
-                  <strong className={wins / graded.length >= BREAKEVEN ? 'pos-txt' : 'neg-txt'}>{wins}-{graded.length - wins}</strong>
-                  <span className="muted">{Math.round((wins / graded.length) * 100)}% hit rate</span>
-                </div>
-              )}
-
-              <div className="section-head"><h2>{P.source ? `${(P.books || ['PrizePicks']).join(' + ')} lines` : 'Your saved lines'}</h2><span className="muted small">{evaluated.length} line{evaluated.length === 1 ? '' : 's'}</span></div>
-              <div className="toolbar">
-                <select value={market} onChange={(e) => setMarket(e.target.value)} aria-label="Stat type">
-                  <option value="ALL">All stats</option>
-                  {marketsPresent.map((m) => <option key={m} value={m}>{cfg.markets[m].label}</option>)}
-                </select>
-                <Segmented options={['ALL', 'OVER', 'UNDER']} value={side} onChange={setSide} label="Pick side" />
-                <select value={minGrade} onChange={(e) => setMinGrade(e.target.value)} aria-label="Minimum confidence">
-                  <option value="pass">All lines</option>
-                  <option value="lean">Lean or better</option>
-                  <option value="solid">Solid or better</option>
-                  <option value="strong">Strong only</option>
-                </select>
-                <div className="search">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-                  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player or team" aria-label="Search lines" />
-                </div>
-                <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
-                  <option value="prob">Sort: confidence</option>
-                  <option value="edge">Sort: gap vs line</option>
-                  <option value="time">Sort: kickoff</option>
-                </select>
-                <label className="check"><input type="checkbox" checked={showStarted} onChange={(e) => setShowStarted(e.target.checked)} /> Include started games</label>
-              </div>
-              {filtered.length === 0 ? (
-                <Card><Empty title="No lines match these filters">Try “All lines”, another stat, or include started games.</Empty></Card>
-              ) : (
-                <div className="props-list">{filtered.map((e) => <PropRow key={e.id} e={e} />)}</div>
-              )}
-            </>
-          )}
-
           <HighChance ctx={ctx} rows={rows} onSave={saveCheck} />
 
           <PlayerBoard ctx={ctx} rows={rows} feed={evaluated} manual={P.manual} onSave={saveCheck} />
 
-          {P.lines.length === 0 && <NoLines onSetup={() => setShowSettings(true)} />}
+          {cfg.sport === 'cfb' && P.lines.length === 0 && <NoLines onSetup={() => setShowSettings(true)} />}
         </>
       )}
 

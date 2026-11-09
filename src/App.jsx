@@ -10,6 +10,7 @@ import Game from './pages/Game.jsx';
 import Home from './pages/Home.jsx';
 import Matchups from './pages/Matchups.jsx';
 import Projections from './pages/Projections.jsx';
+import Props from './pages/Props.jsx';
 import Scan from './pages/Scan.jsx';
 import Parlays from './pages/Parlays.jsx';
 import Record, { NbaRecordRoute } from './pages/Record.jsx';
@@ -20,18 +21,21 @@ import { NbaPlayerPanel, NbaTeamPanel } from './nba/components.jsx';
 import { NbaDataProvider } from './nba/data.jsx';
 import { TennisDataProvider } from './tennis/data.jsx';
 import * as CFB_API from './cfb/api.js';
+import CfbProps from './cfb/pages/Props.jsx';
 import CfbPicks from './cfb/pages/Picks.jsx';
 import { TennisPlayerPanel } from './tennis/components.jsx';
 import TennisHome from './tennis/pages/Home.jsx';
 import TennisMatch from './tennis/pages/Match.jsx';
 import TennisPicks from './tennis/pages/Picks.jsx';
 import TennisBets from './tennis/pages/Bets.jsx';
+import TennisProps from './tennis/pages/Props.jsx';
 import TennisRankings from './tennis/pages/Rankings.jsx';
 import TennisRecord from './tennis/pages/Record.jsx';
 import NbaGame from './nba/pages/Game.jsx';
 import NbaHome from './nba/pages/Home.jsx';
 import NbaMatchups from './nba/pages/Matchups.jsx';
 import NbaProjections from './nba/pages/Projections.jsx';
+import NbaProps from './nba/pages/Props.jsx';
 import NbaScan from './nba/pages/Scan.jsx';
 import NbaParlays from './nba/pages/Parlays.jsx';
 import NbaStats from './nba/pages/Stats.jsx';
@@ -40,28 +44,28 @@ import NbaTeams from './nba/pages/Teams.jsx';
 const SPORTS = {
   nfl: {
     Provider: DataProvider,
-    pages: { home: Home, game: Game, projections: Projections, scan: Scan, parlays: Parlays, slips: Slips, record: Record, stats: Stats, teams: Teams, matchups: Matchups },
+    pages: { home: Home, game: Game, projections: Projections, props: Props, scan: Scan, parlays: Parlays, slips: Slips, record: Record, stats: Stats, teams: Teams, matchups: Matchups },
     panels: {},
     credit: 'Stats & projections via Sleeper · Scores, standings & logos via ESPN',
     footer: (core) => (core ? `${core.season} season · data refreshes automatically each week` : ''),
   },
   nba: {
     Provider: NbaDataProvider,
-    pages: { home: NbaHome, game: NbaGame, projections: NbaProjections, scan: NbaScan, parlays: NbaParlays, slips: NbaSlipsRoute, record: NbaRecordRoute, stats: NbaStats, teams: NbaTeams, matchups: NbaMatchups },
+    pages: { home: NbaHome, game: NbaGame, projections: NbaProjections, props: NbaProps, scan: NbaScan, parlays: NbaParlays, slips: NbaSlipsRoute, record: NbaRecordRoute, stats: NbaStats, teams: NbaTeams, matchups: NbaMatchups },
     panels: { PlayerPanelC: NbaPlayerPanel, TeamPanelC: NbaTeamPanel },
     credit: 'Box scores & projections via Sleeper · Scores, standings & logos via ESPN',
     footer: (core) => (core ? `${core.label} season · data refreshes automatically every night` : ''),
   },
   cfb: {
     Provider: ({ children }) => <DataProvider api={CFB_API} sport="cfb">{children}</DataProvider>,
-    pages: { home: Home, game: Game, projections: Projections, picks: CfbPicks, stats: Stats, teams: Teams, matchups: Matchups },
+    pages: { home: Home, game: Game, projections: Projections, props: CfbProps, picks: CfbPicks, stats: Stats, teams: Teams, matchups: Matchups },
     panels: {},
     credit: 'Scores, box scores, rankings & lines via ESPN · Projections & ratings built from every FBS game',
     footer: (core) => (core ? `${core.season} season · data refreshes several times every Saturday` : ''),
   },
   tennis: {
     Provider: TennisDataProvider,
-    pages: { home: TennisHome, match: TennisMatch, picks: TennisPicks, bets: TennisBets, rankings: TennisRankings, record: TennisRecord },
+    pages: { home: TennisHome, match: TennisMatch, picks: TennisPicks, props: TennisProps, bets: TennisBets, rankings: TennisRankings, record: TennisRecord },
     panels: { PlayerPanelC: TennisPlayerPanel, TeamPanelC: TennisPlayerPanel },
     credit: 'Scores, draws & rankings via ESPN · Player ratings built from every result since last season',
     footer: () => 'Tennis data refreshes daily, live scores every 30 seconds',

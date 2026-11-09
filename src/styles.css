@@ -2769,3 +2769,21 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 .srch-go { color: var(--muted); font-size: 22px; }
 .dock-search { padding: 0; cursor: pointer; font: inherit; }
 .srch-field { min-width: 0; } .srch-cancel { flex-shrink: 0; padding: 8px 2px; }
+
+/* ---- Tennis props: all players ---- */
+.tp-list { display: flex; flex-direction: column; gap: 10px; }
+.tp-row { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
+.tp-who { display: flex; align-items: center; gap: 12px; background: none; border: 0; padding: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.tp-who > span { display: flex; flex-direction: column; min-width: 0; }
+.tp-who b { font-size: 16px; }
+.tp-who small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-proj { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tp-proj span { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 12px; background: var(--surface-2); }
+.tp-proj small { color: var(--muted); font-size: 11px; }
+.tp-proj b { font-size: 17px; }
+.tp-check { display: flex; align-items: center; gap: 8px; }
+.tp-check select, .tp-check input { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 8px 10px; font-size: 16px; min-width: 0; }
+.tp-check input { width: 76px; }
+.tp-res { margin-left: auto; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.tp-res.over b { color: #22c55e; }
+.tp-res.under b { color: #ef4444; }

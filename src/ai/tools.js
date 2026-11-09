@@ -203,7 +203,7 @@ export async function runTool(name, input, sports) {
     }
     case 'get_my_slips': {
       const slips = loadSlips();
-      if (!slips.length) return { slips: [], note: 'No saved slips. They are saved with "Save slip & track live" on Parlays or Scan.' };
+      if (!slips.length) return { slips: [], note: 'No saved slips. They are saved with "Save slip & track live" on Props, Parlays or Scan.' };
       return {
         slips: slips.slice(0, 10).map((s) => ({
           title: s.title, saved: new Date(s.created).toISOString(),

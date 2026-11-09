@@ -52,7 +52,10 @@ export function calibrateLine(p, prop, cal) {
   if (!cal || String(prop.id || '').startsWith('h')) return p;
   const tot = p.over + p.under;
   if (!(tot > 0)) return p;
-  const q = Math.min(0.99, Math.max(0.01, 0.5 + cal.s * (p.over / tot - 0.5) + (cal.b || 0)));
+  const mk = cal.markets?.[prop.market];
+  const s = mk ? mk.s : cal.s;
+  const b = mk ? mk.b : (cal.b || 0);
+  const q = Math.min(0.99, Math.max(0.01, 0.5 + s * (p.over / tot - 0.5) + b));
   return { ...p, over: q * tot, under: (1 - q) * tot, rawOver: p.over, rawUnder: p.under, calibrated: true };
 }
 
@@ -160,7 +163,8 @@ export function evaluateProp(prop, ctx) {
   }
 
   const p = calibrateLine(probabilities(M.dist, mean, sd, prop.line), prop, ctx.lineCal);
-  const side = p.over >= p.under ? 'over' : 'under';
+  // When calibration squeezes a line to a dead 50/50, keep the model's own lean for the side.
+  const side = Math.abs(p.over - p.under) > 1e-9 ? (p.over > p.under ? 'over' : 'under') : ((p.rawOver ?? p.over) >= (p.rawUnder ?? p.under) ? 'over' : 'under');
   const prob = Math.max(p.over, p.under);
   let grade = GRADES.find((g) => prob >= g.min);
   if (inactive || (n < 2 && projVal == null)) grade = GRADES[3];

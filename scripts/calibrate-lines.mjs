@@ -78,8 +78,9 @@ const rawOver = (r) => {
   const sd = count ? 0 : Math.max((M.cv || 0.3) * r.mean, 0.15 * r.mean, 1);
   return probabilities(count ? 'poisson' : 'normal', r.mean, sd, r.line).over;
 };
-const rows = graded.rows.filter((r) => r.actual !== r.line).map((r) => ({ p: rawOver(r), y: r.actual > r.line ? 1 : 0, date: r.date }));
-const ll = (s, b) => rows.reduce((a, { p, y }) => { const q = Math.min(0.999, Math.max(0.001, 0.5 + s * (p - 0.5) + b)); return a - Math.log(y ? q : 1 - q); }, 0) / rows.length;
+const rows = graded.rows.filter((r) => r.actual !== r.line && MK[r.market]).map((r) => ({ m: r.market, p: rawOver(r), y: r.actual > r.line ? 1 : 0, date: r.date }));
+const llOf = (rs, s, b) => rs.reduce((a, { p, y }) => { const q = Math.min(0.999, Math.max(0.001, 0.5 + s * (p - 0.5) + b)); return a - Math.log(y ? q : 1 - q); }, 0) / rs.length;
+const ll = (s, b) => llOf(rows, s, b);
 const nights = new Set(rows.map((r) => r.date)).size;
 let s = DEFAULT.s;
 let b = DEFAULT.b;
@@ -92,9 +93,26 @@ if (rows.length >= MIN_N) {
   }
   [, s, b] = best;
 }
+// Per stat: the model's lean is worth more on some stats (threes, steals) than others, and the
+// projections run high on a few (rebounds, combos). Fit each stat with 60+ graded lines, then
+// shrink toward the overall fit by sample size so a small sample can't swing it far.
+const markets = {};
+if (rows.length >= MIN_N) {
+  for (const m of new Set(rows.map((r) => r.m))) {
+    const rs = rows.filter((r) => r.m === m);
+    if (rs.length < 60) continue;
+    let best = [Infinity, 0, 0];
+    for (let si = 0; si <= 100; si += 2) for (let bi = -12; bi <= 12; bi += 1) {
+      const v = llOf(rs, si / 100, bi / 100);
+      if (v < best[0]) best = [v, si / 100, bi / 100];
+    }
+    const w = rs.length / (rs.length + 250);
+    markets[m] = { n: rs.length, s: Math.round((w * best[1] + (1 - w) * s) * 100) / 100, b: Math.round((w * best[2] + (1 - w) * b) * 1000) / 1000 };
+  }
+}
 const strong = rows.filter((r) => Math.abs(r.p - 0.5) >= 0.2);
 const out = {
-  generatedAt: new Date().toISOString(), sport, n: rows.length, nights, s, b,
+  generatedAt: new Date().toISOString(), sport, n: rows.length, nights, s, b, markets,
   usingDefault: rows.length < MIN_N,
   modelSide70: strong.length ? { n: strong.length, hit: strong.filter((r) => (r.p > 0.5) === (r.y === 1)).length / strong.length } : null,
   overRate: rows.length ? rows.filter((r) => r.y).length / rows.length : null,

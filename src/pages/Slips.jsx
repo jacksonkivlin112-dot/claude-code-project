@@ -10,6 +10,7 @@ import { defaultMult, deleteSlip, loadSlips, onSlipsChange, saveSlip, setBet, se
 import { PAYOUTS } from '../slipMath.js';
 import { legStatus } from '../tracker.js';
 import { LegBar, useSlipAlerts } from '../components/Tracking.jsx';
+import { hypeLine, sendHype } from '../ai/hype.js';
 import { Avatar, Card, Empty, kickoff, timeAgo, useNow } from '../components/ui.jsx';
 
 const fmtVal = (v) => (v == null ? '—' : Number.isInteger(v) ? String(v) : v.toFixed(1));
@@ -67,16 +68,19 @@ function SlipsPage({ home, own }) {
         const st = v.sts[i];
         if (st.state !== 'final') return;
         const when = new Date(l.gameTime || v.slip.created).getTime();
-        out.push({ key: `${v.slip.id}|${i}`, when, title: `${st.hit ? '✅' : st.push ? '➖' : '❌'} ${l.player} ${st.hit ? 'hit' : st.push ? 'pushed' : 'missed'}`, body: `${l.side === 'over' ? 'More' : 'Less'} ${l.line} ${l.stat}: ${fmtVal(st.actual)} · ${v.slip.title}` });
+        out.push({ key: `${v.slip.id}|${i}`, when, hype: st.push ? null : { kind: st.hit ? 'hit' : 'miss', player: l.player, side: l.side === 'under' ? 'Less' : 'More', line: l.line, stat: l.stat, actual: st.actual ?? 0 }, title: `${st.hit ? '✅' : st.push ? '➖' : '❌'} ${l.player} ${st.hit ? 'hit' : st.push ? 'pushed' : 'missed'}`, body: `${l.side === 'over' ? 'More' : 'Less'} ${l.line} ${l.stat}: ${fmtVal(st.actual)} · ${v.slip.title}` });
       });
       if (v.st.key === 'won' || v.st.key === 'lost') {
         const when = Math.max(...v.slip.legs.map((l) => new Date(l.gameTime || 0).getTime()));
-        out.push({ key: `${v.slip.id}|done`, when, title: v.st.key === 'won' ? `🏆 ${v.slip.title} won!` : `${v.slip.title} lost`, body: v.st.label });
+        const pay = v.settled?.payout ? money(v.settled.payout) : null;
+        out.push({ key: `${v.slip.id}|done`, when, hype: { kind: v.st.key, title: v.slip.title, legs: v.slip.legs.length, hits: v.st.hit, payout: v.st.key === 'won' ? pay : null }, title: v.st.key === 'won' ? `🏆 ${v.slip.title} won!` : `${v.slip.title} lost`, body: v.st.label });
       }
     }
     return out;
   }, [view]);
-  useSlipAlerts(perm === 'granted' ? events : []);
+  const alerts = useMemo(() => events.map((e) => (e.hype ? { ...e, body: `${hypeLine(e.hype)}\n${e.body}` } : e)), [events]);
+  useSlipAlerts(perm === 'granted' ? alerts : []);
+  useHype(events);
 
   const ask = async () => { try { setPerm(await Notification.requestPermission()); } catch { /* ignore */ } };
   // A slip is finished once every leg is decided (a Flex slip can still pay after a miss).
@@ -577,4 +581,27 @@ function EntrySheet({ v, sports, onClose }) {
     </div>,
     document.body,
   );
+}
+
+const HYPED = 'ge:slips:hyped';
+/** Pop a hype toast for each fresh result (once per leg/slip, remembered across reloads). */
+function useHype(events) {
+  const seen = useRef(null);
+  useEffect(() => {
+    if (!seen.current) {
+      try { seen.current = new Set(JSON.parse(localStorage.getItem(HYPED)) || []); } catch { seen.current = new Set(); }
+      // First run on this device: don't replay old results.
+      if (!localStorage.getItem(HYPED)) { events.forEach((e) => seen.current.add(e.key)); try { localStorage.setItem(HYPED, JSON.stringify([...seen.current])); } catch { /* ignore */ } return; }
+    }
+    let changed = false;
+    const fresh = [];
+    for (const ev of events) {
+      if (seen.current.has(ev.key)) continue;
+      seen.current.add(ev.key); changed = true;
+      if (ev.hype && Date.now() - ev.when < 8 * 3600e3) fresh.push(ev.hype);
+    }
+    // Slip result beats its own leg results; cap the burst.
+    fresh.sort((a, b) => (b.kind === 'won' || b.kind === 'lost') - (a.kind === 'won' || a.kind === 'lost')).slice(0, 3).forEach((h, i) => setTimeout(() => sendHype(h), i * 900));
+    if (changed) { try { localStorage.setItem(HYPED, JSON.stringify([...seen.current].slice(-500))); } catch { /* ignore */ } }
+  }, [events]);
 }

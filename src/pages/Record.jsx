@@ -57,7 +57,7 @@ function RecordPage({ sport }) {
       {sum.lines.n + sum.safe.n === 0 ? (
         <Card>
           <Empty title="No graded picks yet">
-            The record fills in automatically. Picks are logged whenever you open Props or this page before games start, then graded once the box scores are in. {pending.length ? `${pending.length} picks are waiting on their games right now.` : 'Open Props before the next games to start logging.'}
+            The record fills in automatically. Picks are logged whenever you open this page before games start, then graded once the box scores are in. {pending.length ? `${pending.length} picks are waiting on their games right now.` : 'Open this page before the next games to start logging.'}
           </Empty>
         </Card>
       ) : (
@@ -131,7 +131,7 @@ function RecordPage({ sport }) {
       )}
 
       <p className="disclaimer">
-        The record is kept on this device, starting the first time you opened Props after this feature shipped. Picks that were never logged (because the app wasn’t opened before the game) aren’t counted.{' '}
+        The record is kept on this device, starting the first time you opened it after this feature shipped. Picks that were never logged (because the app wasn’t opened before the game) aren’t counted.{' '}
         {confirm
           ? <><button type="button" className="link" onClick={() => { clearPicks(sport); setVer((x) => x + 1); setConfirm(false); }}>Yes, clear it</button> · <button type="button" className="link" onClick={() => setConfirm(false)}>Cancel</button></>
           : <button type="button" className="link" onClick={() => setConfirm(true)}>Reset record</button>}

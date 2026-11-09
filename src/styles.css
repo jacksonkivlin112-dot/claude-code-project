@@ -2723,3 +2723,31 @@ body { background: radial-gradient(900px 340px at 50% -120px, color-mix(in srgb,
 .potd-body b { font-size: 17px; }
 .potd-body small { color: var(--muted); }
 .potd-why { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
+
+/* ---- Tennis betting picks ---- */
+.tb-best-list, .tb-matches { display: flex; flex-direction: column; gap: 10px; }
+.tb-bet { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.tb-bet-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tb-bet-main b { font-size: 15.5px; }
+.tb-bet-main small, .tb-match-main small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-bet-p, .tb-p { display: flex; flex-direction: column; align-items: flex-end; font-variant-numeric: tabular-nums; }
+.tb-bet-p b { font-size: 19px; color: #22c55e; }
+.tb-bet-p small, .tb-p small { color: var(--muted); font-size: 11.5px; }
+.tb-best { margin-bottom: 18px; }
+.tb-match { border-radius: 16px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
+.tb-match-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.tb-faces { display: flex; }
+.tb-faces > * + * { margin-left: -10px; }
+.tb-match-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tb-match-main b { font-size: 15.5px; }
+.tb-chip { font-size: 12px; font-weight: 800; padding: 6px 10px; border-radius: 12px; background: rgba(34, 197, 94, 0.14); color: #22c55e; max-width: 42%; text-align: center; line-height: 1.25; }
+.tb-chip.muted { background: var(--surface-2); color: var(--muted); }
+.tb-markets { border-top: 1px solid var(--border); padding: 4px 14px 12px; }
+.tb-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.tb-k { color: var(--muted); font-size: 12px; font-weight: 700; }
+.tb-v { display: flex; flex-direction: column; min-width: 0; }
+.tb-v b { font-size: 14px; }
+.tb-v small { color: var(--muted); font-size: 11.5px; }
+.tb-p b { font-size: 15px; }
+.tb-p.good b { color: #22c55e; }
+.tb-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }

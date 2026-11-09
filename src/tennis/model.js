@@ -135,3 +135,54 @@ export function overProb(outlook, line) {
 
 /** Fair American odds for a probability. */
 export const americanOdds = (p) => (p <= 0 || p >= 1 ? '—' : p >= 0.5 ? `-${Math.round((p / (1 - p)) * 100)}` : `+${Math.round(((1 - p) / p) * 100)}`);
+
+/**
+ * Joint distribution of final games (A's games, B's games) for an outlook.
+ * -> Map "ga|gb" -> probability
+ */
+export function gamesJoint(outlook) {
+  if (outlook._joint) return outlook._joint;
+  const need = outlook.bestOf === 5 ? 3 : 2;
+  const sets = [...setScoreDist(outlook.q)].map(([k, v]) => { const [x, y] = k.split('-').map(Number); return { x, y, p: v }; });
+  let states = new Map([['0|0|0|0', 1]]);
+  const out = new Map();
+  for (let guard = 0; guard < 6 && states.size; guard++) {
+    const next = new Map();
+    for (const [k, pr] of states) {
+      const [sa, sb, ga, gb] = k.split('|').map(Number);
+      for (const s of sets) {
+        const pp = pr * s.p;
+        if (pp < 1e-10) continue;
+        const na = sa + (s.x > s.y ? 1 : 0);
+        const nb = sb + (s.x > s.y ? 0 : 1);
+        const key = (na === need || nb === need) ? `${ga + s.x}|${gb + s.y}` : null;
+        if (key) out.set(key, (out.get(key) || 0) + pp);
+        else { const nk = `${na}|${nb}|${ga + s.x}|${gb + s.y}`; next.set(nk, (next.get(nk) || 0) + pp); }
+      }
+    }
+    states = next;
+  }
+  outlook._joint = out;
+  return out;
+}
+
+/** P(f(ga, gb) > line) over the joint games distribution. */
+export function jointProb(outlook, f, line) {
+  let p = 0; let mean = 0;
+  for (const [k, v] of gamesJoint(outlook)) { const [a, b] = k.split('|').map(Number); const x = f(a, b); mean += x * v; if (x > line) p += v; }
+  return { p, mean };
+}
+
+/** Highest x.5 line whose "over" still hits with at least `target` chance. */
+export function safeOverLine(outlook, f, target = 0.75) {
+  const vals = new Map();
+  for (const [k, v] of gamesJoint(outlook)) { const [a, b] = k.split('|').map(Number); const x = f(a, b); vals.set(x, (vals.get(x) || 0) + v); }
+  const xs = [...vals.keys()].sort((a, b) => a - b);
+  let best = null;
+  for (const x of xs) {
+    const line = x - 0.5;
+    let p = 0; for (const [y, v] of vals) if (y > line) p += v;
+    if (p >= target) best = { line, p }; else break;
+  }
+  return best;
+}

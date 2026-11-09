@@ -32,7 +32,7 @@ export default function HypeHost() {
               ))}
             </span>
           )}
-          <span className="hype-ai">✦ AI</span>
+          <span className="hype-ai">{t.e.kind === 'injury' ? '⚠ News' : '✦ AI'}</span>
           <p>{t.text}</p>
         </div>
       ))}

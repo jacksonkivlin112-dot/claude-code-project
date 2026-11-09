@@ -4,90 +4,32 @@ import { TeamLogo } from '../components/ui.jsx';
 import { runOcr } from './Scan.jsx';
 import { parseSlipText, repairLine } from '../slipParse.js';
 import { buildRoster, nextGame } from '../slipRoster.js';
+import { buildSafePicks } from './Props.jsx';
 import { normName } from '../oddsapi.js';
-import { CFGS, OWN_HOOK, SPORT_LABEL, useDualSports } from '../dualSport.jsx';
-import { defaultMult, deleteSlip, loadSlips, onSlipsChange, saveSlip, setBet, settleBet, storeResults } from '../slips.js';
+import { CFGS, SPORT_LABEL } from '../dualSport.jsx';
+import { fmtVal, legGame, legInjury, liveChance, money, useSlipsHub } from '../slipsLive.jsx';
+import { defaultMult, deleteSlip, saveSlip, setBet } from '../slips.js';
 import { PAYOUTS } from '../slipMath.js';
-import { legStatus } from '../tracker.js';
-import { LegBar, useSlipAlerts } from '../components/Tracking.jsx';
-import { hypeLine, sendHype } from '../ai/hype.js';
+import { LegBar } from '../components/Tracking.jsx';
 import { Avatar, Card, Empty, kickoff, timeAgo, useNow } from '../components/ui.jsx';
 
-const fmtVal = (v) => (v == null ? '—' : Number.isInteger(v) ? String(v) : v.toFixed(1));
-
-function statusOf(leg, sports) {
-  if (leg.result) return { state: 'final', ...leg.result };
-  const ctx = sports[leg.sport]?.ctx;
-  if (!ctx) return { state: 'loading' };
-  return legStatus(leg, { markets: CFGS[leg.sport].markets, season: ctx.season, liveById: ctx.liveById, gameByTeam: ctx.gameByTeam });
-}
 
 const lastGame = (s) => Math.max(s.created || 0, ...s.legs.map((l) => new Date(l.gameTime || 0).getTime()));
-const money = (n, sign = false) => `${sign && n > 0 ? '+' : n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: Math.abs(n) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
-function slipState(sts) {
-  const hit = sts.filter((s) => s.state === 'final' && s.hit).length;
-  const miss = sts.filter((s) => s.state === 'final' && !s.hit && !s.push).length;
-  const voids = sts.filter((s) => s.state === 'void' || s.push).length;
-  const open = sts.length - hit - miss - voids;
-  const live = sts.some((s) => s.state === 'live');
-  if (miss) return { key: 'lost', label: open ? `Lost · ${miss} miss${miss > 1 ? 'es' : ''}` : `Lost · ${hit} of ${sts.length} hit`, hit, miss, open, voids };
-  if (!open) return { key: 'won', label: voids ? `Won · ${hit} hit, ${voids} void` : `Won · all ${hit} hit`, hit, miss, open, voids };
-  if (live || hit) return { key: 'live', label: `Live · ${hit} of ${sts.length} hit so far`, hit, miss, open, voids };
-  return { key: 'pending', label: 'Upcoming', hit, miss, open, voids };
-}
+export default function Slips({ params }) { return <SlipsPage params={params} />; }
+export function NbaSlipsRoute({ params }) { return <SlipsPage params={params} />; }
 
-export default function Slips() { return <SlipsPage home="nfl" own={OWN_HOOK.nfl()} />; }
-export function NbaSlipsRoute() { return <SlipsPage home="nba" own={OWN_HOOK.nba()} />; }
-
-function SlipsPage({ home, own }) {
-  const [sports, bridge] = useDualSports(home, own);
-  const [slips, setSlips] = useState(loadSlips);
+function SlipsPage({ params }) {
+  const { view, sports } = useSlipsHub();
   const [perm, setPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
-  useEffect(() => onSlipsChange(setSlips), []);
   useNow(30000);
-
-  const view = useMemo(() => slips.map((s) => {
-    const sts = s.legs.map((l) => statusOf(l, sports));
-    const st = slipState(sts);
-    const settled = st.open === 0 ? settleBet(s.bet, s.legs.length, st.hit, st.miss, st.voids) : null;
-    return { slip: s, sts, st, settled };
-  }), [slips, sports]);
-
-  // Keep final results with the slip.
-  useEffect(() => {
-    const ups = [];
-    for (const v of view) v.sts.forEach((st, i) => { if (st.state === 'final' && !v.slip.legs[i].result) ups.push({ id: v.slip.id, i, result: { actual: st.actual, hit: st.hit, push: !!st.push } }); });
-    if (ups.length) storeResults(ups);
-  }, [view]);
-
-  const events = useMemo(() => {
-    const out = [];
-    for (const v of view) {
-      v.slip.legs.forEach((l, i) => {
-        const st = v.sts[i];
-        if (st.state !== 'final') return;
-        const when = new Date(l.gameTime || v.slip.created).getTime();
-        out.push({ key: `${v.slip.id}|${i}`, when, hype: st.push ? null : { kind: st.hit ? 'hit' : 'miss', player: l.player, side: l.side === 'under' ? 'Less' : 'More', line: l.line, stat: l.stat, actual: st.actual ?? 0 }, title: `${st.hit ? '✅' : st.push ? '➖' : '❌'} ${l.player} ${st.hit ? 'hit' : st.push ? 'pushed' : 'missed'}`, body: `${l.side === 'over' ? 'More' : 'Less'} ${l.line} ${l.stat}: ${fmtVal(st.actual)} · ${v.slip.title}` });
-      });
-      if (v.st.key === 'won' || v.st.key === 'lost') {
-        const when = Math.max(...v.slip.legs.map((l) => new Date(l.gameTime || 0).getTime()));
-        const pay = v.settled?.payout ? money(v.settled.payout) : null;
-        out.push({ key: `${v.slip.id}|done`, when, hype: { kind: v.st.key, title: v.slip.title, legs: v.slip.legs.length, hits: v.st.hit, payout: v.st.key === 'won' ? pay : null }, title: v.st.key === 'won' ? `🏆 ${v.slip.title} won!` : `${v.slip.title} lost`, body: v.st.label });
-      }
-    }
-    return out;
-  }, [view]);
-  const alerts = useMemo(() => events.map((e) => (e.hype ? { ...e, body: `${hypeLine(e.hype)}\n${e.body}` } : e)), [events]);
-  useSlipAlerts(perm === 'granted' ? alerts : []);
-  useHype(events);
 
   const ask = async () => { try { setPerm(await Notification.requestPermission()); } catch { /* ignore */ } };
   // A slip is finished once every leg is decided (a Flex slip can still pay after a miss).
   const active = view.filter((v) => v.st.open > 0);
   const settled = view.filter((v) => v.st.open === 0).sort((a, b) => lastGame(b.slip) - lastGame(a.slip));
   const [tab, setTab] = useState('open');
-  const [openId, setOpenId] = useState(null);
+  const [openId, setOpenId] = useState(() => params?.get?.('entry') || null);
   const openView = view.find((v) => v.slip.id === openId) || null;
 
   return (
@@ -105,7 +47,6 @@ function SlipsPage({ home, own }) {
             : <button type="button" className="btn" onClick={ask}>🔔 Alert me when legs hit</button>}
         </div>
       </div>
-      {bridge}
       <nav className="ent-tabs">
         <button type="button" className={tab === 'open' ? 'on' : ''} onClick={() => setTab('open')}>Open</button>
         <button type="button" className={tab === 'past' ? 'on' : ''} onClick={() => setTab('past')}>Past</button>
@@ -116,6 +57,8 @@ function SlipsPage({ home, own }) {
             <div><b>{active.length}</b><span>{active.length === 1 ? 'Entry' : 'Entries'} open</span></div>
             <div><b>{money(active.reduce((a, v) => a + (toWin(v.slip) || 0), 0))}</b><span>Potential winnings</span></div>
           </div>
+          <PickOfDay sports={sports} />
+          <Bankroll view={view} />
           <UploadSlip sports={sports} />
           {active.length === 0 ? (
             <Card><Empty title="No open entries">Upload a slip screenshot above, or tap <strong>☆ Save slip & track live</strong> on a slip in Props or the Parlay Builder.</Empty></Card>
@@ -124,7 +67,7 @@ function SlipsPage({ home, own }) {
               {[['Live', active.filter((v) => v.sts.some((x) => x.state === 'live') || v.st.hit || v.st.miss)], ['Upcoming', active.filter((v) => !(v.sts.some((x) => x.state === 'live') || v.st.hit || v.st.miss))]].map(([label, list]) => list.length > 0 && (
                 <section key={label} className="ent-sec">
                   <h3>{label}</h3>
-                  {list.map((v) => <EntryCard key={v.slip.id} v={v} onOpen={() => setOpenId(v.slip.id)} />)}
+                  {list.map((v) => <EntryCard key={v.slip.id} v={v} sports={sports} onOpen={() => setOpenId(v.slip.id)} />)}
                 </section>
               ))}
             </>
@@ -133,6 +76,8 @@ function SlipsPage({ home, own }) {
       ) : (
         <>
           {settled.length > 0 ? <BetRecord settled={settled} openCount={active.length} /> : <Card><Empty title="No finished entries yet">Entries move here once every pick is decided.</Empty></Card>}
+          {settled.length > 0 && <BetInsights settled={settled} />}
+          {settled.length > 0 && <Bankroll view={view} />}
           <section className="ent-sec">{settled.map((v) => <EntryCard key={v.slip.id} v={v} onOpen={() => setOpenId(v.slip.id)} />)}</section>
         </>
       )}
@@ -463,8 +408,9 @@ function toWin(slip) {
 const legTone = (s) => (s.state === 'final' ? (s.push ? 'push' : s.hit ? 'hit' : 'miss') : s.state === 'void' ? 'push' : s.state);
 const shortName = (n) => { const p = n.split(' '); return p.length > 1 ? `${p[0][0]}. ${p.slice(1).join(' ')}` : n; };
 
-function EntryCard({ v, onOpen }) {
+function EntryCard({ v, onOpen, sports }) {
   const { slip, sts, st, settled } = v;
+  const injured = sports ? slip.legs.filter((l, i) => sts[i].state === 'pending' && legInjury(l, sports)).length : 0;
   const live = sts.some((x) => x.state === 'live');
   const win = toWin(slip);
   return (
@@ -492,16 +438,9 @@ function EntryCard({ v, onOpen }) {
         <span className="ent-status">{live ? <><span className="live-dot" /> Live</> : st.open === 0 ? (st.key === 'won' ? '✓ Won' : '✕ Lost') : (() => { const t = Math.min(...slip.legs.filter((l, i) => sts[i].state !== 'final' && sts[i].state !== 'void').map((l) => new Date(l.gameTime || 8.64e15).getTime())); return t < 8e15 ? kickoff(new Date(t).toISOString()) : 'Upcoming'; })()}</span>
       </div>
       <small className="ent-names">{slip.legs.map((l) => shortName(l.player)).join(', ')}</small>
+      {injured > 0 && <em className="ent-inj">⚠ {injured} player{injured > 1 ? 's' : ''} on the injury report</em>}
     </button>
   );
-}
-
-/** Game header for a pick: league, matchup with scores, and Final / live clock / start time. */
-function legGame(leg, sports) {
-  const S = sports[leg.sport];
-  const g = S?.ctx?.gameByTeam?.[leg.team];
-  if (!g || (leg.gameTime && Math.abs(new Date(g.date) - new Date(leg.gameTime)) > 12 * 3600e3)) return null;
-  return g;
 }
 
 function EntrySheet({ v, sports, onClose }) {
@@ -539,6 +478,8 @@ function EntrySheet({ v, sports, onClose }) {
           const actual = s.actual ?? (s.state === 'final' ? 0 : null);
           const fill = actual == null ? 0 : Math.max(0, Math.min(1, actual / Math.max(l.line, 0.5)));
           const tone = legTone(s);
+          const inj = s.state === 'pending' || s.state === 'live' ? legInjury(l, sports) : null;
+          const ch = s.state === 'live' || s.state === 'pending' ? liveChance(l, s, sports) : null;
           return (
             <article key={i} className={`ent-leg ${tone}`}>
               <div className="ent-leg-head">
@@ -554,6 +495,7 @@ function EntrySheet({ v, sports, onClose }) {
                 <span className="ent-who">
                   <b>{l.player}</b>
                   <small><TeamLogo abbr={l.team} size={16} /> {[l.team, pos].filter(Boolean).join(' • ')}</small>
+                  {inj && <em className={`ent-inj ${inj.status === 'Questionable' ? 'q' : ''}`}>⚠ {inj.status}{inj.part ? ` · ${inj.part}` : ''}</em>}
                 </span>
                 <span className="ent-line">
                   <b>{l.side === 'under' ? '↓' : '↑'} {l.line}</b>
@@ -564,10 +506,20 @@ function EntrySheet({ v, sports, onClose }) {
                 <span className="ent-bar-fill" style={{ width: `${fill * 100}%` }} />
                 {actual != null && <span className="ent-bubble" style={{ left: `clamp(22px, ${fill * 100}%, calc(100% - 22px))` }}>{fmtVal(actual)}</span>}
               </div>
+              {ch && (
+                <div className="ent-chance">
+                  <span className={`ent-pct ${ch.chance >= 0.6 ? 'good' : ch.chance < 0.35 ? 'bad' : ''}`}>{Math.round(ch.chance * 100)}% to hit</span>
+                  <small>{s.state === 'live'
+                    ? `${ch.pace != null ? `On pace for ${fmtVal(Math.round(ch.pace * 10) / 10)}` : 'Just started'}${l.side !== 'under' && ch.need > 0 ? ` · needs ${fmtVal(Math.round((Number.isInteger(l.line) ? ch.need + 1 : ch.need + 0.5) * 10) / 10)} more` : ''}`
+                    : 'Model chance before the game'}</small>
+                </div>
+              )}
             </article>
           );
         })}
+        {st.open === 0 && <EntryRecap v={v} />}
         <div className="ent-sheet-foot">
+          <button type="button" className="btn ent-share" onClick={() => shareEntry(v)}>📤 Share {st.key === 'won' ? 'this win' : 'entry'}</button>
           <BetLine v={v} />
           {confirm ? (
             <div className="ent-del">
@@ -583,25 +535,223 @@ function EntrySheet({ v, sports, onClose }) {
   );
 }
 
-const HYPED = 'ge:slips:hyped';
-/** Pop a hype toast for each fresh result (once per leg/slip, remembered across reloads). */
-function useHype(events) {
-  const seen = useRef(null);
+
+/** AI recap of a finished entry: instant summary, upgraded by Claude when a key is saved. */
+function EntryRecap({ v }) {
+  const { slip, sts, st, settled } = v;
+  const local = useMemo(() => {
+    const rows = slip.legs.map((l, i) => ({ l, s: sts[i], m: (sts[i].actual ?? 0) - l.line }));
+    const hits = rows.filter((r) => r.s.hit);
+    const miss = rows.filter((r) => r.s.state === 'final' && !r.s.hit && !r.s.push);
+    const best = hits.sort((a, b) => (b.l.side === 'under' ? -b.m : b.m) - (a.l.side === 'under' ? -a.m : a.m))[0];
+    const close = miss.sort((a, b) => Math.abs(a.m) - Math.abs(b.m))[0];
+    const parts = [];
+    parts.push(st.key === 'won' ? `Cashed ${st.hit}/${slip.legs.length}${settled && !settled.refunded ? ` for ${money(settled.profit, true)}` : ''} 🔥` : `${st.hit}/${slip.legs.length} hit${settled ? ` (${money(settled.profit, true)})` : ''}.`);
+    if (best) parts.push(`MVP: ${best.l.player} with ${fmtVal(best.s.actual)} ${best.l.stat} on a ${best.l.line} line.`);
+    if (close) parts.push(`${close.l.player} ${Math.abs(close.m) <= Math.max(1, close.l.line * 0.1) ? 'missed by a hair' : 'was the one that sank it'} — ${fmtVal(close.s.actual)} on ${close.l.line}.`);
+    if (st.key !== 'won' && miss.length === 1) parts.push('One leg away. The reads were close — keep stakes steady, no chasing.');
+    return parts.join(' ');
+  }, [slip, sts, st, settled]);
+  const [ai, setAi] = useState(null);
   useEffect(() => {
-    if (!seen.current) {
-      try { seen.current = new Set(JSON.parse(localStorage.getItem(HYPED)) || []); } catch { seen.current = new Set(); }
-      // First run on this device: don't replay old results.
-      if (!localStorage.getItem(HYPED)) { events.forEach((e) => seen.current.add(e.key)); try { localStorage.setItem(HYPED, JSON.stringify([...seen.current])); } catch { /* ignore */ } return; }
+    let key = '';
+    try { key = localStorage.getItem('ge:ai:key') || ''; } catch { /* ignore */ }
+    if (!key) return;
+    const cacheKey = `ge:recap:${slip.id}`;
+    try { const c = localStorage.getItem(cacheKey); if (c) { setAi(c); return; } } catch { /* ignore */ }
+    const legs = slip.legs.map((l, i) => `${l.player} ${l.side === 'under' ? 'Less' : 'More'} ${l.line} ${l.stat}: ${fmtVal(sts[i].actual)} (${sts[i].push ? 'push' : sts[i].hit ? 'hit' : 'miss'})`).join('; ');
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 200, system: 'You recap a finished player-prop entry for the bettor in 2-3 short sentences, casual and friendly. Name the best performer and the leg that decided it. If it lost, be supportive and never encourage chasing losses. No headings.', messages: [{ role: 'user', content: `${st.key === 'won' ? 'Won' : 'Lost'}${settled ? `, profit ${money(settled.profit, true)}` : ''}. Legs: ${legs}` }] }),
+    }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+      const t = j?.content?.find((c) => c.type === 'text')?.text?.trim();
+      if (t) { setAi(t); try { localStorage.setItem(cacheKey, t); } catch { /* ignore */ } }
+    }).catch(() => {});
+  }, [slip.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="ent-recap">
+      <span className="hype-ai">✦ AI recap</span>
+      <p>{ai || local}</p>
+    </div>
+  );
+}
+
+/** Draws the entry as a share image and opens the share sheet (or downloads it). */
+async function shareEntry(v) {
+  const { slip, sts, st, settled } = v;
+  const W = 1080; const rowH = 150; const H = 270 + slip.legs.length * rowH + 140;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const grad = x.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, st.key === 'won' ? '#064e3b' : '#111114'); grad.addColorStop(1, '#000');
+  x.fillStyle = grad; x.fillRect(0, 0, W, H);
+  const font = (w, px) => `${w} ${px}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+  x.fillStyle = '#fff'; x.font = font(900, 64);
+  const win = toWin(slip);
+  x.fillText(slip.bet ? `${money(slip.bet.stake)} to win ${money(win || 0)}` : slip.title, 64, 130);
+  x.font = font(600, 36); x.fillStyle = '#a1a1aa';
+  x.fillText(`${slip.bet ? playText(slip) : `${slip.legs.length}-pick slip`}`, 64, 190);
+  if (st.open === 0) {
+    x.font = font(900, 56); x.fillStyle = st.key === 'won' ? '#22c55e' : '#ef4444';
+    const t = st.key === 'won' ? (settled && !settled.refunded ? `WON ${money(settled.profit, true)}` : 'WON') : 'LOST';
+    x.fillText(t, W - 64 - x.measureText(t).width, 130);
+  }
+  slip.legs.forEach((l, i) => {
+    const y = 250 + i * rowH; const s = sts[i];
+    x.fillStyle = 'rgba(255,255,255,0.06)'; x.beginPath(); x.roundRect(48, y, W - 96, rowH - 20, 28); x.fill();
+    const tone = s.state === 'final' ? (s.push ? '#9ca3af' : s.hit ? '#22c55e' : '#ef4444') : '#fff';
+    x.fillStyle = tone; x.beginPath(); x.arc(118, y + 65, 34, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#000'; x.font = font(900, 36); const mk = s.state === 'final' ? (s.push ? '–' : s.hit ? '✓' : '✕') : '•';
+    x.fillText(mk, 118 - x.measureText(mk).width / 2, y + 78);
+    x.fillStyle = '#fff'; x.font = font(800, 40); x.fillText(l.player, 180, y + 58);
+    x.fillStyle = '#a1a1aa'; x.font = font(600, 30); x.fillText(`${l.side === 'under' ? '↓ Less' : '↑ More'} ${l.line} ${l.stat}`, 180, y + 102);
+    if (s.actual != null) { x.fillStyle = tone; x.font = font(900, 52); const a = fmtVal(s.actual); x.fillText(a, W - 90 - x.measureText(a).width, y + 84); }
+  });
+  x.fillStyle = '#71717a'; x.font = font(700, 30); x.fillText('Tracked with Gridiron Edge', 64, H - 60);
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  if (!blob) return;
+  const file = new File([blob], 'entry.png', { type: 'image/png' });
+  try {
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: 'My entry' }); return; }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'entry.png'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+// ---- Insights, bankroll, pick of the day ---------------------------------------
+
+/** Which kinds of picks actually win for you (leg level, all finished entries). */
+function BetInsights({ settled }) {
+  const legs = [];
+  for (const v of settled) v.slip.legs.forEach((l, i) => { const s = v.sts[i]; if (s.state === 'final' && !s.push) legs.push({ l, hit: !!s.hit }); });
+  if (legs.length < 3) return null;
+  const group = (key) => {
+    const m = new Map();
+    for (const x of legs) { const k = key(x.l); if (!k) continue; const g = m.get(k) || { k, n: 0, h: 0 }; g.n += 1; g.h += x.hit ? 1 : 0; m.set(k, g); }
+    return [...m.values()].filter((g) => g.n >= 2).sort((a, b) => b.h / b.n - a.h / a.n || b.n - a.n);
+  };
+  const all = legs.filter((x) => x.hit).length / legs.length;
+  const stats = group((l) => `${SPORT_LABEL[l.sport] || l.sport} ${l.stat}`);
+  const sides = group((l) => (l.side === 'under' ? 'Less' : 'More'));
+  const sportsG = group((l) => SPORT_LABEL[l.sport] || l.sport);
+  const players = group((l) => l.player);
+  const row = (g) => (
+    <li key={g.k}>
+      <span>{g.k}</span>
+      <span className="ins-bar"><i style={{ width: `${(g.h / g.n) * 100}%` }} className={g.h / g.n >= 0.6 ? 'good' : g.h / g.n < 0.45 ? 'bad' : ''} /></span>
+      <b>{Math.round((g.h / g.n) * 100)}%</b><small>{g.h}/{g.n}</small>
+    </li>
+  );
+  const best = stats[0]; const worst = stats.length > 1 ? stats[stats.length - 1] : null;
+  return (
+    <section className="ins">
+      <h3>Your betting insights</h3>
+      <p className="muted small">{legs.length} graded picks · {Math.round(all * 100)}% hit overall{best && best.h / best.n > all ? ` · best at ${best.k} (${Math.round((best.h / best.n) * 100)}%)` : ''}{worst && worst.h / worst.n < all ? ` · fade ${worst.k} (${Math.round((worst.h / worst.n) * 100)}%)` : ''}</p>
+      {stats.length > 0 && <><h4>By stat</h4><ul>{stats.slice(0, 6).map(row)}</ul></>}
+      <div className="ins-2">
+        {sides.length > 0 && <div><h4>More vs Less</h4><ul>{sides.map(row)}</ul></div>}
+        {sportsG.length > 0 && <div><h4>By sport</h4><ul>{sportsG.map(row)}</ul></div>}
+      </div>
+      {players.length > 0 && (
+        <div className="ins-2">
+          <div><h4>Most reliable</h4><ul>{players.slice(0, 3).map(row)}</ul></div>
+          {players.length > 3 && <div><h4>Burned you</h4><ul>{players.slice(-3).reverse().map(row)}</ul></div>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const BANK = 'ge:bankroll';
+/** Bankroll mode: starting bankroll + unit size, current balance, stake suggestion and a cool-off warning. */
+function Bankroll({ view }) {
+  const [cfg, setCfg] = useState(() => { try { return JSON.parse(localStorage.getItem(BANK)) || null; } catch { return null; } });
+  const [edit, setEdit] = useState(false);
+  const [start, setStart] = useState(cfg?.start ?? '');
+  const [unitPct, setUnitPct] = useState(cfg?.unitPct ?? 2);
+  const save = () => {
+    const n = Number(start);
+    if (!(n > 0)) return;
+    const next = { start: n, unitPct: Number(unitPct) || 2, since: cfg?.since || Date.now() };
+    setCfg(next); setEdit(false);
+    try { localStorage.setItem(BANK, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+  if (!cfg && !edit) {
+    return (
+      <button type="button" className="bank bank-cta" onClick={() => setEdit(true)}>
+        <span>💰</span><span><b>Set up bankroll mode</b><small>Track your balance, get stake sizes and a heads-up after a rough day</small></span><span>›</span>
+      </button>
+    );
+  }
+  if (edit) {
+    return (
+      <div className="bank">
+        <b>Bankroll mode</b>
+        <label>Starting bankroll <input inputMode="decimal" value={start} onChange={(e) => setStart(e.target.value)} placeholder="$200" /></label>
+        <label>Unit size <select value={unitPct} onChange={(e) => setUnitPct(e.target.value)}>{[1, 2, 3, 5].map((p) => <option key={p} value={p}>{p}% of bankroll</option>)}</select></label>
+        <div className="bank-row">
+          <button type="button" className="btn" onClick={save}>Save</button>
+          <button type="button" className="btn-ghost" onClick={() => setEdit(false)}>Cancel</button>
+          {cfg && <button type="button" className="btn-ghost danger" onClick={() => { setCfg(null); setEdit(false); try { localStorage.removeItem(BANK); } catch { /* ignore */ } }}>Turn off</button>}
+        </div>
+      </div>
+    );
+  }
+  const bets = view.filter((v) => v.settled && lastGame(v.slip) >= cfg.since);
+  const net = bets.reduce((a, v) => a + v.settled.profit, 0);
+  const atRisk = view.filter((v) => !v.settled && v.slip.bet && v.st.open > 0).reduce((a, v) => a + v.slip.bet.stake, 0);
+  const bal = Math.round((cfg.start + net) * 100) / 100;
+  const unit = Math.max(1, Math.round(bal * cfg.unitPct) / 100);
+  const day = new Date(); day.setHours(0, 0, 0, 0);
+  const today = bets.filter((v) => lastGame(v.slip) >= day.getTime()).reduce((a, v) => a + v.settled.profit, 0);
+  let streak = 0;
+  for (const v of [...bets].sort((a, b) => lastGame(b.slip) - lastGame(a.slip))) { if (v.settled.profit < 0) streak += 1; else break; }
+  const tilt = today <= -3 * unit || streak >= 3;
+  return (
+    <div className={`bank ${bal >= cfg.start ? 'up' : 'down'}`}>
+      <div className="bank-row">
+        <div><small>Bankroll</small><b>{money(bal)}</b><small className={bal >= cfg.start ? 'pos-txt' : 'neg-txt'}>{money(bal - cfg.start, true)} since start</small></div>
+        <div><small>1 unit</small><b>{money(unit)}</b><small>{cfg.unitPct}% of bankroll</small></div>
+        <div><small>In play</small><b>{money(atRisk)}</b><small>{atRisk ? `${(atRisk / unit).toFixed(1)} units` : 'nothing open'}</small></div>
+      </div>
+      {tilt && <p className="bank-warn">🧊 {streak >= 3 ? `${streak} losing entries in a row` : `Down ${money(-today)} today`}. Good time to take a break — no need to win it back tonight.</p>}
+      {atRisk > 5 * unit && <p className="bank-warn">⚠ You have {(atRisk / unit).toFixed(1)} units in play — more than the usual 5.</p>}
+      <button type="button" className="link small" onClick={() => setEdit(true)}>Edit bankroll</button>
+    </div>
+  );
+}
+
+/** The model's single best pick for today, fixed for the day once chosen. */
+function PickOfDay({ sports }) {
+  const dayKey = `ge:potd:${new Date().toDateString()}`;
+  const [saved, setSaved] = useState(false);
+  const pick = useMemo(() => {
+    try { const c = JSON.parse(localStorage.getItem(dayKey)); if (c) return c; } catch { /* ignore */ }
+    const all = [];
+    for (const sp of ['nba', 'nfl']) {
+      const S = sports[sp];
+      if (!S?.ctx || !S.rows) continue;
+      try { all.push(...buildSafePicks(CFGS[sp], S.ctx, S.rows, 0.75, S.ctx.gameByTeam).filter((p) => p.state === 'pre' && new Date(p.gameTime || 0) - Date.now() < 36 * 3600e3)); } catch { /* ignore */ }
     }
-    let changed = false;
-    const fresh = [];
-    for (const ev of events) {
-      if (seen.current.has(ev.key)) continue;
-      seen.current.add(ev.key); changed = true;
-      if (ev.hype && Date.now() - ev.when < 8 * 3600e3) fresh.push(ev.hype);
-    }
-    // Slip result beats its own leg results; cap the burst.
-    fresh.sort((a, b) => (b.kind === 'won' || b.kind === 'lost') - (a.kind === 'won' || a.kind === 'lost')).slice(0, 3).forEach((h, i) => setTimeout(() => sendHype(h), i * 900));
-    if (changed) { try { localStorage.setItem(HYPED, JSON.stringify([...seen.current].slice(-500))); } catch { /* ignore */ } }
-  }, [events]);
+    if (!all.length) return null;
+    const p = all.sort((a, b) => b.score - a.score)[0];
+    const out = { sport: p.sport, playerId: p.playerId, player: p.player, team: p.team, opp: p.opp, market: p.market, stat: p.stat, statLabel: p.statLabel, line: p.line, side: 'over', prob: p.prob, gameTime: p.gameTime, gameId: p.gameId, period: p.sport === 'nba' ? (p.gameTime ? new Date(p.gameTime).toLocaleDateString('en-CA') : undefined) : (p.week ? `W${p.week}` : undefined), hits: p.hits, n: p.n, mean: p.mean };
+    try { localStorage.setItem(dayKey, JSON.stringify(out)); } catch { /* ignore */ }
+    return out;
+  }, [sports, dayKey]);
+  if (!pick) return null;
+  const nm = pick.player.split(' ');
+  return (
+    <div className="potd">
+      <div className="potd-head"><span className="hype-ai">✦ AI pick of the day</span><small>{SPORT_LABEL[pick.sport]} · {pick.gameTime ? kickoff(pick.gameTime) : ''}</small></div>
+      <div className="potd-body">
+        <Avatar player={{ id: pick.playerId, sport: pick.sport, team: pick.team, first: nm[0], last: nm.slice(-1)[0] }} size={52} />
+        <div><b>{pick.player}</b><small>{pick.team}{pick.opp ? ` vs ${pick.opp}` : ''}</small></div>
+        <span className="ent-line"><b>↑ {pick.line}</b><small>{pick.stat}</small></span>
+      </div>
+      <p className="potd-why">Cleared this in {pick.hits} of the last {pick.n} games and projects for {fmtVal(Math.round(pick.mean * 10) / 10)}. The model gives it about {Math.round(pick.prob * 100)}% — the safest line on the board today, not a lock.</p>
+      <button type="button" className="btn-ghost" disabled={saved} onClick={() => { saveSlip({ title: `Pick of the day · ${pick.player}`, source: 'potd', legs: [pick] }); setSaved(true); }}>{saved ? 'Tracking ✓' : '☆ Track this pick'}</button>
+    </div>
+  );
 }

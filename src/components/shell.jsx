@@ -9,6 +9,7 @@ import { Segmented, TeamLogo, kickoff, timeAgo, useNow, useUi } from './ui.jsx';
 const NBA_NAV = [
   { path: 'home', label: 'Tonight', short: 'Tonight', icon: 'M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z' },
   { path: 'projections', label: 'Projections', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
+  { path: 'props', label: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
   { path: 'scan', label: 'Slip Scan', short: 'Scan', icon: 'M3 7h3l2-3h8l2 3h3v13H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
   { path: 'parlays', label: 'Parlay Builder', short: 'Parlays', icon: 'M4 6h11M4 12h8M4 18h11M18 5l3 3-3 3M18 13l3 3-3 3' },
   { path: 'slips', label: 'My Slips', short: 'Slips', icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3' },
@@ -27,6 +28,7 @@ const TENNIS_NAV = [
 ];
 const CFB_NAV = [
   { path: 'home', label: 'This Week', short: 'Week', icon: 'M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10' },
+  { path: 'props', label: 'Props & Best Picks', short: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
   { path: 'picks', label: 'Game Picks', short: 'Picks', icon: 'M4 6h11M4 12h8M4 18h11M18 5l3 3-3 3M18 13l3 3-3 3' },
   { path: 'projections', label: 'Projections', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
   { path: 'stats', label: 'Season Stats', short: 'Stats', icon: 'M4 6h16M4 12h16M4 18h10' },
@@ -41,6 +43,7 @@ const SPORT_NAME = { nfl: 'NFL', cfb: 'CFB', nba: 'NBA', tennis: 'Tennis' };
 const NAV = [
   { path: 'home', label: 'This Week', short: 'Week', icon: 'M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10' },
   { path: 'projections', label: 'Projections', icon: 'M4 19h16M6 16V9m5 7V5m5 11v-5m4 5V8' },
+  { path: 'props', label: 'Props', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
   { path: 'scan', label: 'Slip Scan', short: 'Scan', icon: 'M3 7h3l2-3h8l2 3h3v13H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
   { path: 'parlays', label: 'Parlay Builder', short: 'Parlays', icon: 'M4 6h11M4 12h8M4 18h11M18 5l3 3-3 3M18 13l3 3-3 3' },
   { path: 'slips', label: 'My Slips', short: 'Slips', icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3' },
@@ -243,7 +246,7 @@ function LeagueTabs({ route, anyLive }) {
   );
 }
 
-const DOCK = ['home', 'parlays', 'scan', 'slips'];
+const DOCK = ['home', 'props', 'parlays', 'scan', 'slips'];
 
 /** Floating rounded bottom bar with the main sections, plus a separate search button. */
 export function MobileNav({ route }) {

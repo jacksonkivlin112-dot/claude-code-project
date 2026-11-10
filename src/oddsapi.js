@@ -21,13 +21,18 @@ export const MARKETS = {
   player_receptions: { label: 'Receptions', short: 'Rec', get: (s) => s.rec, dist: 'poisson', pos: ['RB', 'WR', 'TE'] },
   player_reception_yds: { label: 'Receiving Yards', short: 'Rec Yds', get: (s) => s.rec_yd, dist: 'normal', cv: 0.55, pos: ['RB', 'WR', 'TE'] },
   player_rush_reception_yds: { label: 'Rush + Rec Yards', short: 'Rush+Rec', get: (s) => sum(s.rush_yd, s.rec_yd), dist: 'normal', cv: 0.4, pos: ['RB', 'WR', 'TE'] },
+  // Touchdown props (PrizePicks posts these; no free sportsbook feed, so feed: false keeps them out of line requests).
+  player_rush_tds: { label: 'Rush TDs', short: 'Rush TD', get: (s) => s.rush_td, dist: 'poisson', pos: ['QB', 'RB', 'WR'], feed: false },
+  player_reception_tds: { label: 'Rec TDs', short: 'Rec TD', get: (s) => s.rec_td, dist: 'poisson', pos: ['RB', 'WR', 'TE'], feed: false },
+  player_rush_reception_tds: { label: 'Rush + Rec TDs', short: 'Rush+Rec TD', get: (s) => sum(s.rush_td, s.rec_td), dist: 'poisson', pos: ['QB', 'RB', 'WR', 'TE'], feed: false },
+  player_pass_rush_reception_tds: { label: 'Pass + Rush + Rec TDs', short: 'Pass+Rush+Rec TD', get: (s) => sum(sum(s.pass_td, s.rush_td), s.rec_td), dist: 'poisson', pos: ['QB'], feed: false },
 };
 
 function sum(a, b) {
   return a == null && b == null ? undefined : (a || 0) + (b || 0);
 }
 
-export const DEFAULT_MARKETS = Object.keys(MARKETS);
+export const DEFAULT_MARKETS = Object.keys(MARKETS).filter((k) => MARKETS[k].feed !== false);
 
 // NBA markets. Stats are Sleeper per-game box-score keys.
 const g = (s, k) => s?.[k];
@@ -96,7 +101,7 @@ export async function listEventsWithQuota(apiKey, fetchImpl = fetch, sport = 'nf
  */
 export async function fetchPrizePicksLines(apiKey, { sport = 'nfl', events, markets, withinHours = sport === 'nba' ? 36 : 8 * 24, fetchImpl = fetch } = {}) {
   const cfg = SPORTS[sport];
-  markets = markets?.length ? markets : Object.keys(cfg.markets);
+  markets = (markets?.length ? markets : Object.keys(cfg.markets)).filter((k) => cfg.markets[k]?.feed !== false);
   const now = Date.now();
   const list = (events || (await listEvents(apiKey, fetchImpl, sport))).filter((e) => {
     const t = new Date(e.commence_time).getTime();

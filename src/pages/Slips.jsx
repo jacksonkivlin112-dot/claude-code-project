@@ -205,7 +205,8 @@ function UploadSlip({ sports }) {
   }).map((x, i) => {
     // Flag readings that don't fit the player (e.g. 99.5 points + assists for a 30-a-game scorer).
     const ex = x.problem ? null : expectFor(x.sport, x.player, x.market);
-    const odd = ex > 0 && (x.line / ex > 2.2 || x.line / ex < 0.4);
+    // Small-count stats (TDs, steals) sit at 0.5 no matter the average, so also need a real gap.
+    const odd = ex > 0 && x.line > 0.5 && Math.abs(x.line - ex) >= 1.5 && (x.line / ex > 2.2 || x.line / ex < 0.4);
     return { ...x, guessed: found[i].guessed, odd, expected: ex };
   }); }
 
@@ -282,7 +283,7 @@ function UploadSlip({ sports }) {
                   ) : <small className="muted">Skipped: {l.problem}</small>}
                   {l.problem && cfg && <small className="up-warn">{l.problem === 'stat not read' ? 'Pick the stat to include this one' : `Skipped: ${l.problem}`}</small>}
                   {l.guessed && !l.problem && <small className="up-warn">Stat wasn’t readable, so this is a guess from the line. Check it.</small>}
-                  {l.odd && <small className="up-warn">⚠ {l.line} looks off for {l.player.split(' ').slice(-1)[0]} (usually about {Math.round(l.expected * 10) / 10}). Check this one.</small>}
+                  {l.odd && <small className="up-warn">⚠ {l.line} looks off for {l.player.replace(/\s+(jr\.?|sr\.?|ii|iii|iv)$/i, '').split(' ').slice(-1)[0]} (usually about {Math.round(l.expected * 10) / 10}). Check this one.</small>}
                 </li>
               );
             })}

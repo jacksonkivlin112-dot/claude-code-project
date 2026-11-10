@@ -77,7 +77,7 @@ export function usePropLines(sport) {
   const [manual, setManualState] = useState(() => readJSON(LS.manual, []));
   const [apiKey, setApiKeyState] = useState(() => { try { return localStorage.getItem(LS.key) || ''; } catch { return ''; } });
   const [interval, setIntervalPref] = usePersistentState('propsInterval', '15');
-  const [marketsPref, setMarketsPref] = usePersistentState(sport === 'nba' ? 'nbaPropsMarkets' : 'propsMarkets', Object.keys(marketsMap).join(','));
+  const [marketsPref, setMarketsPref] = usePersistentState(sport === 'nba' ? 'nbaPropsMarkets' : 'propsMarkets', Object.keys(marketsMap).filter((k) => marketsMap[k].feed !== false).join(','));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const markets = marketsPref.split(',').filter((m) => marketsMap[m]);

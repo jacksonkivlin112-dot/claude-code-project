@@ -52,6 +52,7 @@ const RANGE = {
   player_turnovers: [0.5, 5], player_points_rebounds_assists: [8, 60], player_points_rebounds: [6, 50], player_points_assists: [6, 50], player_rebounds_assists: [3, 24], player_blocks_steals: [0.5, 5],
   player_pass_yds: [120, 350], player_pass_tds: [0.5, 3.5], player_pass_completions: [10, 35], player_pass_attempts: [18, 45], player_pass_interceptions: [0.5, 1.5], player_pass_rush_yds: [140, 400],
   player_rush_yds: [8, 140], player_rush_attempts: [3, 25], player_receptions: [0.5, 10], player_reception_yds: [8, 130], player_rush_reception_yds: [15, 170],
+  player_rush_tds: [0.5, 1.5], player_reception_tds: [0.5, 1.5], player_rush_reception_tds: [0.5, 1.5], player_pass_rush_reception_tds: [0.5, 3.5],
 };
 
 /**
@@ -82,7 +83,7 @@ export function repairLine(raw, hadDecimal, market, player) {
 // Words that appear in stat names, for snapping OCR near-misses ("Yatds" -> "yards").
 const STAT_WORDS = ['points', 'pts', 'rebounds', 'rebs', 'reb', 'assists', 'asts', 'ast', 'made', 'threes', 'pointers', 'blocks', 'blks', 'steals', 'stls',
   'turnovers', 'pass', 'passing', 'yards', 'yds', 'rush', 'rushing', 'receiving', 'receptions', 'completions', 'attempts', 'touchdowns', 'tds', 'interceptions',
-  'carries', 'fantasy', 'score'];
+  'carries', 'fantasy', 'score', 'anytime', 'touchdown'];
 /** Fix common OCR slips in stat names before matching them. */
 function fixStatText(t) {
   let x = t.replace(/\b3\s*[-.–·]?\s*[p7][t7]s?\b/gi, '3-pt').replace(/\b[|il](?=(rebs?|asts?|pts|reb|ast)\b)/gi, '');
@@ -106,7 +107,9 @@ function lettersAsNumber(tok) {
   const m = tok.match(/^[M1↑↓]?([A-Za-z0-9]{2,3})$/);
   if (!m) return null;
   const d = [...m[1]].map((c) => (/\d/.test(c) ? c : LOOKS[c])).join('');
-  return /^\d{2,4}$/.test(d) ? parseFloat(d) : null;
+  if (!/^\d{2,4}$/.test(d)) return null;
+  // A leading zero means the decimal point was lost: "Os" -> "05" -> 0.5.
+  return /^0\d$/.test(d) ? parseFloat(`0.${d[1]}`) : parseFloat(d);
 }
 
 const SIDE_OVER = /\b(more|higher|over|mor)\b|▲|↑/i;
@@ -164,7 +167,7 @@ export function parseSlipText(text, roster, aliases) {
       } else {
         const toks = tail.trim().split(/\s+/).filter(Boolean);
         const n = toks.length ? lettersAsNumber(toks[toks.length - 1]) : null;
-        if (n != null) line = { raw: n };
+        if (n != null) line = n % 1 ? n : { raw: n };
       }
     }
     for (const l of windowLines) {

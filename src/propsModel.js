@@ -273,6 +273,10 @@ export function evaluateProp(prop, ctx) {
 // ---- Manual entry parsing ---------------------------------------------------
 
 const MARKET_ALIASES = [
+  ['player_fg_attempts', ['fg attempted', 'fg attempts', 'fga', 'field goals attempted', 'field goal attempts']],
+  ['player_field_goals', ['fg made', 'fgs made', 'field goals made', 'field goal made', 'fgm', 'field goals', 'fg']],
+  ['player_kicking_points', ['kicking points', 'kicking pts', 'kick pts', 'kicker points', 'kicking point']],
+  ['player_pats', ['xp made', 'xps made', 'extra points made', 'extra points', 'pat made', 'pats made', 'pats']],
   ['player_pass_rush_reception_tds', ['pass+rush+rec tds', 'pass+rush+rec td', "pass+rush+rec td's", 'pass+rush+rec touchdowns', 'pass+rush+receiving tds', 'pass+rush+rec', 'pass+rush+receiving']],
   ['player_rush_reception_tds', ['rush+rec tds', 'rush+rec td', "rush+rec td's", 'rush+rec touchdowns', 'rush+receiving tds', 'rec+rush tds', 'anytime td', 'anytime tds', 'anytime touchdown', 'anytime touchdowns', 'anytime touchdown scorer']],
   ['player_rush_tds', ['rush tds', 'rush td', 'rushing tds', 'rushing td', 'rushing touchdowns', 'rush touchdowns']],

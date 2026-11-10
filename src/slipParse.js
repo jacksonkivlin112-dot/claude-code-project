@@ -53,6 +53,7 @@ const RANGE = {
   player_pass_yds: [120, 350], player_pass_tds: [0.5, 3.5], player_pass_completions: [10, 35], player_pass_attempts: [18, 45], player_pass_interceptions: [0.5, 1.5], player_pass_rush_yds: [140, 400],
   player_rush_yds: [8, 140], player_rush_attempts: [3, 25], player_receptions: [0.5, 10], player_reception_yds: [8, 130], player_rush_reception_yds: [15, 170],
   player_rush_tds: [0.5, 1.5], player_reception_tds: [0.5, 1.5], player_rush_reception_tds: [0.5, 1.5], player_pass_rush_reception_tds: [0.5, 3.5],
+  player_field_goals: [0.5, 3.5], player_kicking_points: [4.5, 12.5], player_pats: [0.5, 4.5], player_fg_attempts: [0.5, 3.5],
 };
 
 /**
@@ -83,7 +84,7 @@ export function repairLine(raw, hadDecimal, market, player) {
 // Words that appear in stat names, for snapping OCR near-misses ("Yatds" -> "yards").
 const STAT_WORDS = ['points', 'pts', 'rebounds', 'rebs', 'reb', 'assists', 'asts', 'ast', 'made', 'threes', 'pointers', 'blocks', 'blks', 'steals', 'stls',
   'turnovers', 'pass', 'passing', 'yards', 'yds', 'rush', 'rushing', 'receiving', 'receptions', 'completions', 'attempts', 'touchdowns', 'tds', 'interceptions',
-  'carries', 'fantasy', 'score', 'anytime', 'touchdown'];
+  'carries', 'fantasy', 'score', 'anytime', 'touchdown', 'kicking', 'field', 'goals', 'attempted', 'extra'];
 /** Fix common OCR slips in stat names before matching them. */
 function fixStatText(t) {
   let x = t.replace(/\b3\s*[-.–·]?\s*[p7][t7]s?\b/gi, '3-pt').replace(/\b[|il](?=(rebs?|asts?|pts|reb|ast)\b)/gi, '');

@@ -26,6 +26,11 @@ export const MARKETS = {
   player_reception_tds: { label: 'Rec TDs', short: 'Rec TD', get: (s) => s.rec_td, dist: 'poisson', pos: ['RB', 'WR', 'TE'], feed: false },
   player_rush_reception_tds: { label: 'Rush + Rec TDs', short: 'Rush+Rec TD', get: (s) => sum(s.rush_td, s.rec_td), dist: 'poisson', pos: ['QB', 'RB', 'WR', 'TE'], feed: false },
   player_pass_rush_reception_tds: { label: 'Pass + Rush + Rec TDs', short: 'Pass+Rush+Rec TD', get: (s) => sum(sum(s.pass_td, s.rush_td), s.rec_td), dist: 'poisson', pos: ['QB'], feed: false },
+  // Kickers.
+  player_field_goals: { label: 'FG Made', short: 'FG Made', get: (s) => s.fgm, dist: 'poisson', pos: ['K'], feed: false },
+  player_kicking_points: { label: 'Kicking Points', short: 'Kick Pts', get: (s) => (s.kick_pts ?? (s.fgm == null && s.xpm == null ? undefined : 3 * (s.fgm || 0) + (s.xpm || 0))), dist: 'normal', cv: 0.45, pos: ['K'], feed: false },
+  player_pats: { label: 'XP Made', short: 'XP Made', get: (s) => s.xpm, dist: 'poisson', pos: ['K'], feed: false },
+  player_fg_attempts: { label: 'FG Attempted', short: 'FG Att', get: (s) => s.fga, dist: 'poisson', pos: ['K'], feed: false },
 };
 
 function sum(a, b) {

@@ -33,10 +33,13 @@ export function resultStale(leg, sports) {
 }
 
 export function statusOf(leg, sports) {
-  if (leg.result && !resultStale(leg, sports)) return { state: 'final', ...leg.result };
   const ctx = sports[leg.sport]?.ctx;
-  if (!ctx) return { state: 'loading' };
-  return legStatus(leg, { markets: CFGS[leg.sport].markets, season: ctx.season, liveById: ctx.liveById, gameByTeam: ctx.gameByTeam });
+  if (!ctx) return leg.result ? { state: 'final', ...leg.result } : { state: 'loading' };
+  // The box score wins whenever it has this game; a saved result is only for games no longer loaded.
+  const s = legStatus(leg, { markets: CFGS[leg.sport].markets, season: ctx.season, liveById: ctx.liveById, gameByTeam: ctx.gameByTeam });
+  if (s.state === 'final' || s.state === 'live') return s;
+  if (leg.result && !resultStale(leg, sports)) return { state: 'final', ...leg.result };
+  return s;
 }
 
 export function slipState(sts) {
@@ -188,8 +191,12 @@ export function SlipsHub({ route, children }) {
       v.sts.forEach((st, i) => {
         const leg = v.slip.legs[i];
         // Only save a result once the game is over; clear any that were saved too early.
-        if (st.state === 'final' && !leg.result && !(legGame(leg, sports)?.state && legGame(leg, sports).state !== 'post')) ups.push({ id: v.slip.id, i, result: { actual: st.actual, hit: st.hit, push: !!st.push } });
-        else if (resultStale(leg, sports)) ups.push({ id: v.slip.id, i, result: undefined });
+        const g = legGame(leg, sports);
+        const over = !g || g.state === 'post';
+        const r = leg.result;
+        const differs = !r || r.actual !== st.actual || !!r.hit !== !!st.hit || !!r.push !== !!st.push;
+        if (st.state === 'final' && over && differs) ups.push({ id: v.slip.id, i, result: { actual: st.actual, hit: st.hit, push: !!st.push } });
+        else if (r && (resultStale(leg, sports) || st.state === 'live')) ups.push({ id: v.slip.id, i, result: undefined });
       });
     }
     if (ups.length) storeResults(ups);

@@ -156,7 +156,9 @@ export function getProjections(season, week) {
 // fallback. In dev, Vite proxies /espn-api to ESPN so live data always works.
 
 const ESPN_LIVE = import.meta.env.DEV ? '/espn-api' : ESPN_BASE;
-let liveBlocked = false;
+// A failed live request pauses live scores for 2 minutes (not the whole session), then retries.
+let liveBlockedUntil = 0;
+const liveBlocked = () => Date.now() < liveBlockedUntil;
 
 export function getSnapshot() {
   return cached(
@@ -202,7 +204,7 @@ export async function getScoreboard(season, week, { force = false } = {}) {
     source: 'snapshot',
     asOf: snap.generatedAt,
   };
-  if (liveBlocked || (!force && !import.meta.env.DEV && !needsLive(fromSnap.games, snap.generatedAt))) return fromSnap;
+  if (liveBlocked() || (!force && !import.meta.env.DEV && !needsLive(fromSnap.games, snap.generatedAt))) return fromSnap;
   const key = `sb-live:${season}:${week}`;
   const hit = readCache(key, 40 * 1000);
   if (hit) return hit;
@@ -213,7 +215,7 @@ export async function getScoreboard(season, week, { force = false } = {}) {
     writeCache(key, live, false);
     return live;
   } catch {
-    if (!import.meta.env.DEV) liveBlocked = true; // CORS-blocked: don't keep retrying
+    if (!import.meta.env.DEV) liveBlockedUntil = Date.now() + 2 * 60 * 1000;
     return fromSnap;
   }
 }

@@ -7,7 +7,9 @@ export const MAX_WEEK = 17;
 const BASE = `${import.meta.env.BASE_URL}data/cfb/`;
 const ESPN_LIVE = import.meta.env.DEV ? '/espn-api' : ESPN_BASE;
 const id = (x) => x;
-let liveBlocked = false;
+// A failed live request pauses live scores for 2 minutes (not the whole session), then retries.
+let liveBlockedUntil = 0;
+const liveBlocked = () => Date.now() < liveBlockedUntil;
 
 const file = (name, ttl) => cached(`cfb:${name}`, ttl, async () => {
   const r = await fetch(BASE + name, { cache: 'no-cache' });
@@ -43,7 +45,7 @@ export async function getScoreboard(season, week, { force = false } = {}) {
   const fromSnap = { games, byes: [], source: 'snapshot', asOf: snap.generatedAt };
   const now = Date.now();
   const active = games.some((g) => g.state !== 'post' && now > new Date(g.date).getTime() - 15 * MIN && now < new Date(g.date).getTime() + 6 * HOUR);
-  if (liveBlocked || (!force && !import.meta.env.DEV && !active)) return fromSnap;
+  if (liveBlocked() || (!force && !import.meta.env.DEV && !active)) return fromSnap;
   const key = `cfb-sb-live:${season}:${week}`;
   const hit = readCache(key, 40 * 1000);
   if (hit) return hit;
@@ -56,7 +58,7 @@ export async function getScoreboard(season, week, { force = false } = {}) {
     writeCache(key, live, false);
     return live;
   } catch {
-    if (!import.meta.env.DEV) liveBlocked = true;
+    if (!import.meta.env.DEV) liveBlockedUntil = Date.now() + 2 * 60 * 1000;
     return fromSnap;
   }
 }

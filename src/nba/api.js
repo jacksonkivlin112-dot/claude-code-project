@@ -7,7 +7,9 @@ import { ESPN_BASE, normFor, parseScoreboard } from '../espn.js';
 const SLEEPER = 'https://api.sleeper.com';
 const norm = normFor('nba');
 const ESPN_LIVE = import.meta.env.DEV ? '/espn-api' : ESPN_BASE;
-let liveBlocked = false;
+// A failed live request pauses live scores for 2 minutes (not the whole session), then retries.
+let liveBlockedUntil = 0;
+const liveBlocked = () => Date.now() < liveBlockedUntil;
 
 const KEEP = ['pts', 'reb', 'ast', 'stl', 'blk', 'to', 'tpm', 'tpa', 'fgm', 'fga', 'ftm', 'fta', 'oreb', 'dreb', 'min', 'sp', 'pf', 'plus_minus', 'gp', 'gs', 'dd', 'td'];
 
@@ -128,7 +130,7 @@ export async function getSlate(ymd) {
   const snap = await getSnapshot();
   const fromSnap = { games: snap.games.filter((g) => etDate(g.date) === ymd), byes: [], source: 'snapshot', asOf: snap.generatedAt };
   const isToday = ymd === etDate();
-  if (liveBlocked || (!import.meta.env.DEV && !(isToday && needsLive(fromSnap.games, snap.generatedAt)))) return fromSnap;
+  if (liveBlocked() || (!import.meta.env.DEV && !(isToday && needsLive(fromSnap.games, snap.generatedAt)))) return fromSnap;
   const key = `nba:sb-live:${ymd}`;
   const hit = readCache(key, 30 * 1000);
   if (hit) return hit;
@@ -139,7 +141,7 @@ export async function getSlate(ymd) {
     writeCache(key, live, false);
     return live;
   } catch {
-    if (!import.meta.env.DEV) liveBlocked = true;
+    if (!import.meta.env.DEV) liveBlockedUntil = Date.now() + 2 * 60 * 1000;
     return fromSnap;
   }
 }

@@ -34,7 +34,7 @@ export function storeResults(updates) {
   const list = loadSlips();
   for (const { id, i, result } of updates) {
     const s = list.find((x) => x.id === id);
-    if (s?.legs[i]) s.legs[i] = { ...s.legs[i], result };
+    if (s?.legs[i]) { s.legs[i] = { ...s.legs[i], result }; if (result === undefined) delete s.legs[i].result; }
   }
   write(list);
 }

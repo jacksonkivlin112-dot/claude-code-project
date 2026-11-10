@@ -79,9 +79,10 @@ export function legStatus(pick, { markets, season, liveById, gameByTeam }, now =
     const locked = !final && ((pick.side === 'over' && over) || (pick.side === 'under' && over));
     return { state: final || locked ? 'final' : 'live', actual, hit: final || locked ? hit : null, push: final && push, onPace: hit };
   };
-  if (log) return judge(M.get(log.s) ?? 0, true);
   const g = gameByTeam?.[pick.team];
   const sameGame = g && (!pick.gameId || String(g.id) === String(pick.gameId) || Math.abs(new Date(g.date) - new Date(pick.gameTime)) < 12 * 3600e3);
+  // The box-score log fills in during the game too, so it only counts as final once the game is over.
+  if (log) return judge(M.get(log.s) ?? 0, !(sameGame && g.state !== 'post'));
   const live = liveById?.get(pick.playerId);
   if (sameGame && g.state !== 'pre' && live) return judge(M.get(live.s) ?? 0, g.state === 'post');
   if (sameGame && g.state === 'in') return { state: 'live', actual: 0, hit: null, onPace: pick.side === 'under' };

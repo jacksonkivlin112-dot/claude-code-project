@@ -25,8 +25,15 @@ function Bridge({ use, onChange }) {
   return null;
 }
 
+/** A saved result is only trusted while the leg's game isn't still on (or not started) today. */
+export function resultStale(leg, sports) {
+  if (!leg.result) return false;
+  const g = legGame(leg, sports);
+  return !!g && g.state !== 'post';
+}
+
 export function statusOf(leg, sports) {
-  if (leg.result) return { state: 'final', ...leg.result };
+  if (leg.result && !resultStale(leg, sports)) return { state: 'final', ...leg.result };
   const ctx = sports[leg.sport]?.ctx;
   if (!ctx) return { state: 'loading' };
   return legStatus(leg, { markets: CFGS[leg.sport].markets, season: ctx.season, liveById: ctx.liveById, gameByTeam: ctx.gameByTeam });
@@ -177,9 +184,16 @@ export function SlipsHub({ route, children }) {
 
   useEffect(() => {
     const ups = [];
-    for (const v of view) v.sts.forEach((st, i) => { if (st.state === 'final' && !v.slip.legs[i].result) ups.push({ id: v.slip.id, i, result: { actual: st.actual, hit: st.hit, push: !!st.push } }); });
+    for (const v of view) {
+      v.sts.forEach((st, i) => {
+        const leg = v.slip.legs[i];
+        // Only save a result once the game is over; clear any that were saved too early.
+        if (st.state === 'final' && !leg.result && !(legGame(leg, sports)?.state && legGame(leg, sports).state !== 'post')) ups.push({ id: v.slip.id, i, result: { actual: st.actual, hit: st.hit, push: !!st.push } });
+        else if (resultStale(leg, sports)) ups.push({ id: v.slip.id, i, result: undefined });
+      });
+    }
     if (ups.length) storeResults(ups);
-  }, [view]);
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const events = useMemo(() => {
     const out = [];
@@ -218,6 +232,7 @@ export function SlipsHub({ route, children }) {
   useResultEvents(events);
 
   const value = useMemo(() => ({ view, sports }), [view, sports]);
+  if (typeof window !== 'undefined') window.__geHub = value; // for debugging from the console
   return (
     <HubCtx.Provider value={value}>
       {own && need.has(own) && <Bridge key={own} use={OWN_HOOK[own]} onChange={setters[own]} />}

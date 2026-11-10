@@ -14,12 +14,12 @@ export function buildRoster(sports) {
     const S = sports[sp];
     if (!S) continue;
     for (const r of S.rows || []) {
-      if (r.pos === 'K' || r.pos === 'DEF') continue;
+      if (r.pos === 'DEF') continue;
       out.push({ ...r, sport: sp, onSlate: true });
       seen.add(`${sp}:${r.id}`);
     }
     for (const p of S.ctx?.season?.players?.values() || []) {
-      if (seen.has(`${sp}:${p.id}`) || p.pos === 'K' || p.pos === 'DEF' || !(p.log?.length || p.gp)) continue;
+      if (seen.has(`${sp}:${p.id}`) || p.pos === 'DEF' || !(p.log?.length || p.gp)) continue;
       out.push({ id: p.id, name: p.name, first: p.first, last: p.last, pos: p.pos, group: p.group, team: p.team, sport: sp, s: sp === 'nba' && p.avg && Object.keys(p.avg).length ? p.avg : per(p.log), onSlate: false });
     }
   }

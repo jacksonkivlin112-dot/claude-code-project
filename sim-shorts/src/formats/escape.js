@@ -192,6 +192,7 @@ class Escape {
     return {
       titles,
       description: `A ball bouncing inside ${n} spinning rings. Every gap it slips through shatters a ring. Guess the escape time in the comments!\n\n#satisfying #physics #simulation #shorts`,
+      pinned: 'What time did you guess? 👇 Closest guess gets pinned next video',
       tags: ['satisfying', 'physics simulation', 'ball escape', 'bouncing ball', 'satisfying video', 'shorts'],
     };
   }

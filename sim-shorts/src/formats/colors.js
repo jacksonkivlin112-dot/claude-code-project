@@ -168,6 +168,7 @@ class Colors {
         `${this.teams.length} colors, 52 seconds, 1 winner`,
       ],
       description: `Each ball flips every square it hits to its own color. Pick a color and comment before the timer runs out!\n\n#satisfying #colorbattle #simulation #shorts`,
+      pinned: 'Which color did you pick? 👇 Reply with your color before you watch the end',
       tags: ['which color wins', 'color battle', 'satisfying', 'simulation', 'pong wars', 'shorts'],
     };
   }

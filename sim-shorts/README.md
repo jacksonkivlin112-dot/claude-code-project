@@ -8,8 +8,11 @@ Generates satisfying physics-simulation YouTube Shorts: 1080×1920, 60 fps, unde
 | --- | --- | --- |
 | `escape` | A ball bounces inside 7–12 spinning rings, each with a gap. Every bounce plays the next note; slipping through a gap shatters the ring. | "Can the ball escape all N rings?" Guess the time in the comments |
 | `colors` | 2–4 colored balls each flip the squares they hit to their own color. The board swings back and forth for 52 seconds. | "Which color wins?" Pick a color in the comments |
+| `race` | 4–6 marbles race down a randomly built course of pegs, zigzag ramps, funnels, stairs and bumpers. The camera follows the leader, with live standings at the top. | "Which marble wins?" Pick a marble in the comments |
 
-Before rendering, each video is simulated ahead to pick the most watchable version of its seed: escapes are tuned to finish around 34–54 seconds, and color battles favor close, back-and-forth finishes.
+Before rendering, each video is simulated ahead to pick the most watchable version of its seed: escapes are tuned to finish around 34–54 seconds, color battles favor close, back-and-forth finishes, and marble races are built so the winner crosses at 38–52 seconds with plenty of lead changes.
+
+Every video carries a series label at the top ("RING ESCAPE #14", "COLOR BATTLE #3", "MARBLE RACE #7"). Episode numbers continue automatically from `out/series.json`, and the first title idea includes the episode.
 
 ## Make videos
 
@@ -22,9 +25,11 @@ node src/cli.js                            # one random video
 node src/cli.js --format escape --count 5  # five ring escapes
 node src/cli.js --format colors --seed 42  # same seed = same video
 node src/cli.js --count 10 --out out/week1 # a batch, alternating formats
+node src/cli.js --format race --series "Marble Mayhem" --episode 20   # your own series name and numbering
+node src/cli.js --series none               # no series label
 ```
 
-Each video is written as `out/<format>-<seed>.mp4` with a `.json` next to it holding title ideas, a description and tags.
+Each video is written as `out/<format>-<seed>.mp4` with a `.json` next to it holding title ideas, a description and tags. Every run also writes `upload-list.md` in the output folder: a copy-and-paste sheet with the title, description, tags and a suggested pinned comment for each video. Rebuild it for any folder with `node src/sheet.js out/week1`.
 
 ## Uploading
 

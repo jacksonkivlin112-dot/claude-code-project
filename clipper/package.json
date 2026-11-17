@@ -1,0 +1,14 @@
+{
+  "name": "clipper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stream clipper: finds the best moments, cuts vertical Shorts with captions and an original parkour split-screen",
+  "scripts": {
+    "parkour": "node src/parkour.js",
+    "clip": "node src/clip.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "0.1.65",
+    "seedrandom": "3.0.5"
+  }
+}

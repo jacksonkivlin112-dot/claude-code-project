@@ -46,12 +46,21 @@ function writeUploadList(dir, metas, start = tomorrow()) {
 }
 
 const ORDER = ['escape', 'colors', 'race', 'battle'];
-/** Every video's metadata in a folder: by episode, then rotating formats so no two in a row match. */
+/** Every video's metadata in a folder, rotating formats so no two in a row match. */
 function readMetas(dir) {
-  return fs.readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'series.json')
+  const all = fs.readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'series.json')
     .map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')))
-    .filter((m) => m.file && fs.existsSync(path.join(dir, m.file)))
-    .sort((a, b) => (a.episode || 0) - (b.episode || 0) || ORDER.indexOf(a.format) - ORDER.indexOf(b.format) || a.file.localeCompare(b.file));
+    .filter((m) => m.file && fs.existsSync(path.join(dir, m.file)));
+  // One queue per format in episode order, then deal them out round-robin so formats rotate.
+  const queues = new Map();
+  for (const m of all.sort((a, b) => (a.episode || 0) - (b.episode || 0) || a.file.localeCompare(b.file))) {
+    if (!queues.has(m.format)) queues.set(m.format, []);
+    queues.get(m.format).push(m);
+  }
+  const formats = [...queues.keys()].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+  const out = [];
+  while (out.length < all.length) for (const f of formats) { const q = queues.get(f); if (q.length) out.push(q.shift()); }
+  return out;
 }
 
 module.exports = { writeUploadList, readMetas };

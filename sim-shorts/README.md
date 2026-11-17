@@ -7,7 +7,7 @@ Generates satisfying physics-simulation YouTube Shorts: 1080×1920, 60 fps, unde
 | Format | What happens | Hook |
 | --- | --- | --- |
 | `escape` | A ball bounces inside 7–12 spinning rings, each with a gap. Every bounce plays the next note; slipping through a gap shatters the ring. Half the videos use the **multiply** twist: every ring that breaks adds another ball (`--variant classic|multiply` to choose). | "Can the ball escape all N rings?" Guess the time in the comments |
-| `colors` | 2–4 colored balls each flip the squares they hit to their own color. The board swings back and forth for 52 seconds. | "Which color wins?" Pick a color in the comments |
+| `colors` | 2–4 colored balls each flip the squares they hit to their own color. The board swings back and forth for 52 seconds. About a third use the **double** twist: two balls per color (`--variant classic|double`). Close finishes show tenths so the winner is always visible. | "Which color wins?" Pick a color in the comments |
 | `race` | 4–6 marbles race down a randomly built course of pegs, zigzag ramps, funnels, stairs and bumpers. The camera follows the leader, with live standings at the top. | "Which marble wins?" Pick a marble in the comments |
 | `battle` | Two fighter balls with different powers (Spike, Dash, Giant, Vampire, Tank) bounce around an arena. Every hit deals damage and grows the attacker's power; charging in hits harder. Health bars, floating damage numbers and a KO finish. | "Who wins?" Pick a side in the comments |
 

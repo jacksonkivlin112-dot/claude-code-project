@@ -13,7 +13,7 @@ const battle = require('./formats/battle');
 // How to build each format's sim from its plan.
 const FORMATS = {
   escape: { ...escape, create: (rng, p) => new escape.Escape(rng, { gapScale: p.gapScale, variant: p.variant }) },
-  colors: { ...colors, create: (rng) => new colors.Colors(rng) },
+  colors: { ...colors, create: (rng, p) => new colors.Colors(rng, { perTeam: p.perTeam || 1 }) },
   race: { ...race, create: (rng, p) => new race.Race(rng, { sections: p.sections }) },
   battle: { ...battle, create: (rng, p) => new battle.Battle(rng, { dmgScale: p.dmgScale }) },
 };

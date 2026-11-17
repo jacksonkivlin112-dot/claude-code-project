@@ -21,11 +21,15 @@ const SPEED = 900;
 const LENGTH = 52; // seconds of battle
 
 class Colors {
-  constructor(rng) {
+  // perTeam: 1 ball per color (classic) or 2 (double: much more chaotic).
+  constructor(rng, { perTeam = 1 } = {}) {
     this.rng = rng;
+    this.perTeam = perTeam;
     this.hue = Math.floor(rng() * 360);
     const nTeams = [2, 3, 4, 4][Math.floor(rng() * 4)];
-    const order = [...TEAMS].sort(() => rng() - 0.5).slice(0, nTeams);
+    const pool = [...TEAMS];
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    const order = pool.slice(0, nTeams);
     this.teams = order;
     this.grid = new Uint8Array(N * N);
     const owner = (i, j) => {
@@ -34,13 +38,16 @@ class Colors {
       return (i < N / 2 ? 0 : 1) + (j < N / 2 ? 0 : 2);
     };
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) this.grid[j * N + i] = owner(i, j);
-    this.balls = order.map((_, k) => {
+    this.balls = order.flatMap((_, k) => {
       let cx; let cy;
       if (nTeams === 2) { cx = k === 0 ? 0.25 : 0.75; cy = 0.5; }
       else if (nTeams === 3) { cx = (k + 0.5) / 3; cy = 0.5; }
       else { cx = k % 2 ? 0.75 : 0.25; cy = k < 2 ? 0.25 : 0.75; }
-      const a = rng() * Math.PI * 2;
-      return { team: k, x: AX + cx * AW, y: AY + cy * AW, vx: Math.cos(a) * SPEED, vy: Math.sin(a) * SPEED, lastNote: -1 };
+      return Array.from({ length: perTeam }, (_, n) => {
+        const a = rng() * Math.PI * 2;
+        const dy = perTeam > 1 ? (n ? 0.09 : -0.09) : 0; // teammates start apart inside their zone
+        return { team: k, x: AX + cx * AW, y: AY + (cy + dy) * AW, vx: Math.cos(a) * SPEED, vy: Math.sin(a) * SPEED, lastNote: -1 };
+      });
     });
     this.t = 0;
     this.events = [];
@@ -136,14 +143,19 @@ class Colors {
       x += w;
     });
     const cols = this.teams.length;
+    // If the top two round to the same whole number, show tenths so the winner is visible.
+    const pcts = c.map((v) => (v / total) * 100);
+    const top = [...pcts].sort((x, y) => y - x);
+    const tenths = Math.round(top[0]) === Math.round(top[1]);
+    const fmtPct = (p) => (tenths ? p.toFixed(1) : String(Math.round(p)));
     c.forEach((v, k) => {
       const cx = AX + (k + 0.5) * (AW / cols);
-      caption(ctx, `${Math.round((v / total) * 100)}%`, cx, 1640, { size: 64, color: this.teams[k].fill });
+      caption(ctx, `${fmtPct(pcts[k])}%`, cx, 1640, { size: 64, color: this.teams[k].fill });
       caption(ctx, this.teams[k].name, cx, 1705, { size: 34, color: '#ddd', weight: 'SimBold', stroke: 8 });
     });
     // Header.
     const left = Math.max(0, LENGTH - this.t);
-    if (this.t < 3.2) caption(ctx, 'Which color wins?', W / 2, 300, { size: 104, alpha: Math.min(1, (3.2 - this.t) * 2) });
+    if (this.t < 3.2) caption(ctx, this.perTeam > 1 ? 'Which color wins?\n2 balls each' : 'Which color wins?', W / 2, 300, { size: 104, alpha: Math.min(1, (3.2 - this.t) * 2) });
     else if (this.t < LENGTH) {
       caption(ctx, `${Math.ceil(left)}`, W / 2, 290, { size: 150, color: left < 10 ? '#ff6b6b' : '#fff' });
       caption(ctx, 'SECONDS LEFT', W / 2, 395, { size: 42, color: '#ccc', weight: 'SimBold' });
@@ -175,16 +187,19 @@ class Colors {
 }
 
 /** Try several seeds, keep the most back-and-forth battle. */
-function plan(rng0, seed) {
-  let best = { attempt: 0, leadChanges: -1 };
+function plan(rng0, seed, { variant = null } = {}) {
+  // A third of battles use two balls per color, picked by the seed.
+  const v = variant || (rng0(`${seed}:variant`)() < 0.34 ? 'double' : 'classic');
+  const perTeam = v === 'double' ? 2 : 1;
+  let best = { attempt: 0, leadChanges: -1, variant: v, perTeam };
   for (let attempt = 0; attempt < 12; attempt++) {
-    const sim = new Colors(rng0(`${seed}:${attempt}`));
+    const sim = new Colors(rng0(`${seed}:${attempt}`), { perTeam });
     while (sim.t < LENGTH) sim.step(1 / 60);
     const c = sim.counts();
     const sorted = [...c].sort((a, b) => b - a);
     const close = (sorted[0] - sorted[1]) / (N * N) < 0.12; // winner by under 12 points: tense finish
     const score = sim.leadChanges + (close ? 4 : 0);
-    if (score > best.leadChanges) best = { attempt, leadChanges: score };
+    if (score > best.leadChanges) best = { attempt, leadChanges: score, variant: v, perTeam };
   }
   return best;
 }

@@ -12,7 +12,7 @@ const battle = require('./formats/battle');
 
 // How to build each format's sim from its plan.
 const FORMATS = {
-  escape: { ...escape, create: (rng, p) => new escape.Escape(rng, { gapScale: p.gapScale }) },
+  escape: { ...escape, create: (rng, p) => new escape.Escape(rng, { gapScale: p.gapScale, variant: p.variant }) },
   colors: { ...colors, create: (rng) => new colors.Colors(rng) },
   race: { ...race, create: (rng, p) => new race.Race(rng, { sections: p.sections }) },
   battle: { ...battle, create: (rng, p) => new battle.Battle(rng, { dmgScale: p.dmgScale }) },
@@ -44,13 +44,13 @@ function seriesTag(ctx, text) {
   ctx.restore();
 }
 
-async function makeShort({ format, seed, outDir, onProgress, series = SERIES[format], episode = null, music = true }) {
+async function makeShort({ format, seed, outDir, onProgress, series = SERIES[format], episode = null, music = true, variant = null }) {
   const F = FORMATS[format];
   if (!F) throw new Error(`Unknown format "${format}". Options: ${Object.keys(FORMATS).join(', ')}`);
   fs.mkdirSync(outDir, { recursive: true });
 
   // Pick the most watchable variation of this seed before rendering anything.
-  const p = F.plan(rngFor, seed);
+  const p = F.plan(rngFor, seed, variant ? { variant } : undefined);
   const sim = F.create(rngFor(`${seed}:${p.attempt}`), p);
   const ep = series ? (episode ?? nextEpisode(outDir, series)) : null;
   const tag = series ? `${series.toUpperCase()} #${ep}` : null;

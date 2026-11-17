@@ -1,0 +1,14 @@
+{
+  "name": "brand-shorts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Brand-deal Shorts maker: brief + product media -> original voiced Shorts with captions, disclosure and CTA",
+  "scripts": {
+    "make": "node src/make.js",
+    "demo-media": "node src/demo-media.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "0.1.65",
+    "seedrandom": "3.0.5"
+  }
+}

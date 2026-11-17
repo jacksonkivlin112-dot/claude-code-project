@@ -1,0 +1,52 @@
+{
+  "brand": "Quillo",
+  "product": "Quillo Notes",
+  "disclosure": "Paid partnership with Quillo",
+  "hashtags": [
+    "#ad",
+    "#quillo",
+    "#productivity"
+  ],
+  "colors": {
+    "primary": "#6d5dfc",
+    "accent": "#ffd166"
+  },
+  "logo": "media/logo.png",
+  "media": [
+    "media/screen-notes.png",
+    "media/screen-summary.png",
+    "media/screen-search.png",
+    "media/screen-sync.png"
+  ],
+  "hooks": [
+    "I stopped losing my notes the day I found this app.",
+    "This notes app reads your notes so you don't have to.",
+    "Your notes app is making you forget things. Here's the fix.",
+    "Three things this free app does better than the one on your phone."
+  ],
+  "problem": "My notes were everywhere. Half on my phone, half on my laptop, and I could never find anything.",
+  "points": [
+    {
+      "text": "It turns a messy pile of notes into a clean summary in one tap.",
+      "media": "media/screen-summary.png"
+    },
+    {
+      "text": "It pulls out your to-dos automatically, so nothing slips through.",
+      "media": "media/screen-summary.png"
+    },
+    {
+      "text": "Search works like you think. Type that restaurant in Lisbon and it finds it.",
+      "media": "media/screen-search.png"
+    },
+    {
+      "text": "Everything syncs to your phone, laptop and tablet instantly.",
+      "media": "media/screen-sync.png"
+    }
+  ],
+  "cta": "Try Quillo free. Link in bio.",
+  "voices": [
+    "joe",
+    "kristin",
+    "norman"
+  ]
+}

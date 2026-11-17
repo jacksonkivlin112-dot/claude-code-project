@@ -44,7 +44,7 @@ function seriesTag(ctx, text) {
   ctx.restore();
 }
 
-async function makeShort({ format, seed, outDir, onProgress, series = SERIES[format], episode = null }) {
+async function makeShort({ format, seed, outDir, onProgress, series = SERIES[format], episode = null, music = true }) {
   const F = FORMATS[format];
   if (!F) throw new Error(`Unknown format "${format}". Options: ${Object.keys(FORMATS).join(', ')}`);
   fs.mkdirSync(outDir, { recursive: true });
@@ -81,6 +81,7 @@ async function makeShort({ format, seed, outDir, onProgress, series = SERIES[for
   }
   await enc.close();
   synth.buf = synth.buf.subarray(0, Math.ceil((frames / FPS) * 44100));
+  if (music) synth.music(frames / FPS, rngFor(`${seed}:music`));
   synth.writeWav(wtmp);
   await mux(vtmp, wtmp, out);
   cleanup(vtmp, wtmp);

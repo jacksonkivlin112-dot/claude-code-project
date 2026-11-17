@@ -45,6 +45,51 @@ class Synth {
 
   chord(t, steps, opts) { steps.forEach((s, i) => this.tone(t + i * 0.035, noteFreq(s), opts)); }
 
+  /**
+   * Original background beat across the whole track: kick, off-beat hats, a bass line and soft
+   * chords over a I–V–vi–IV progression. Tempo and key come from the seed; it fades in and out
+   * and sits well under the sound effects.
+   */
+  music(seconds, rng, { gain = 0.15 } = {}) {
+    const m = new Float32Array(this.buf.length);
+    const bpm = 108 + Math.floor(rng() * 20);
+    const beat = 60 / bpm;
+    const key = 2 ** ((Math.floor(rng() * 8) - 3) / 12); // shift the key -3..+4 semitones
+    const C = 130.81 * key; // C3
+    const semis = (n) => C * 2 ** (n / 12);
+    const prog = [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]]; // I V vi IV
+    const add = (t, n, fn) => { const st = Math.floor(t * RATE); for (let i = 0; i < n && st + i < m.length; i++) m[st + i] += fn(i / RATE, i); };
+    let seed = 7;
+    const noise = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280 * 2 - 1; };
+    const bars = Math.ceil(seconds / (beat * 4));
+    for (let bar = 0; bar < bars; bar++) {
+      const chord = prog[bar % 4];
+      const t0 = bar * beat * 4;
+      // Pad: the chord, one octave up, slow swell.
+      for (const n of chord) {
+        const f = semis(n + 12);
+        add(t0, Math.floor(beat * 4 * RATE), (x) => Math.sin(2 * Math.PI * f * x) * 0.05 * Math.min(1, x / 0.4) * Math.min(1, (beat * 4 - x) / 0.3));
+      }
+      for (let b = 0; b < 4; b++) {
+        const tb = t0 + b * beat;
+        if (tb > seconds) break;
+        // Kick on every beat.
+        add(tb, Math.floor(0.25 * RATE), (x) => Math.sin(2 * Math.PI * (45 * x + 75 * (1 - Math.exp(-x * 30)) / 30)) * Math.exp(-x * 14) * 0.55);
+        // Hat on the off-beat.
+        add(tb + beat / 2, Math.floor(0.04 * RATE), (x) => noise() * Math.exp(-x * 120) * 0.12);
+        // Bass: chord root on each eighth, plucky.
+        const root = semis(chord[0] - 12);
+        for (const off of [0, beat / 2]) add(tb + off, Math.floor(beat / 2 * RATE), (x) => Math.sin(2 * Math.PI * root * x) * Math.exp(-x * 7) * 0.22);
+      }
+    }
+    const fade = Math.floor(1.2 * RATE);
+    const end = Math.min(m.length, Math.floor(seconds * RATE));
+    for (let i = 0; i < end; i++) {
+      const g = Math.min(1, i / fade, (end - i) / fade);
+      this.buf[i] += m[i] * g * gain;
+    }
+  }
+
   /** Soft limiter + 16-bit WAV. */
   writeWav(file) {
     const n = this.buf.length;

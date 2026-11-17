@@ -11,10 +11,23 @@ const PINNED = {
   battle: 'Which side did you pick? 👇',
 };
 
-function writeUploadList(dir, metas) {
+const SLOTS = [12, 18]; // post at noon and 6 PM
+
+/** Posting time for the i-th video: two a day starting on `start` (a Date at local midnight). */
+function slot(start, i) {
+  const d = new Date(start);
+  d.setDate(d.getDate() + Math.floor(i / SLOTS.length));
+  d.setHours(SLOTS[i % SLOTS.length], 0, 0, 0);
+  return d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function tomorrow() { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); return d; }
+
+function writeUploadList(dir, metas, start = tomorrow()) {
   const rows = metas.map((m, i) => [
     `## ${i + 1}. ${m.file}`,
     '',
+    `**Post:** ${slot(start, i)}`,
     `**Title:** ${m.titles[0]}`,
     `Other titles: ${m.titles.slice(1).join(' · ')}`,
     '',
@@ -27,21 +40,25 @@ function writeUploadList(dir, metas) {
     '',
   ].join('\n'));
   const file = path.join(dir, 'upload-list.md');
-  fs.writeFileSync(file, `# Upload list (${metas.length} videos)\n\nPost one or two a day. Pin the suggested comment right after posting.\n\n${rows.join('\n')}`);
+  const days = Math.ceil(metas.length / SLOTS.length);
+  fs.writeFileSync(file, `# Upload list (${metas.length} videos, ${days} day${days > 1 ? 's' : ''})\n\nTwo a day at noon and 6 PM, starting ${slot(start, 0).split(',').slice(0, 2).join(',')}. Pin the suggested comment right after posting.\nTip: in YouTube Studio you can upload them all now and set each one's "Schedule" time from this list.\n\n${rows.join('\n')}`);
   return file;
 }
 
-/** Every video's metadata in a folder, in episode order. */
+const ORDER = ['escape', 'colors', 'race', 'battle'];
+/** Every video's metadata in a folder: by episode, then rotating formats so no two in a row match. */
 function readMetas(dir) {
   return fs.readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'series.json')
     .map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')))
     .filter((m) => m.file && fs.existsSync(path.join(dir, m.file)))
-    .sort((a, b) => (a.episode || 0) - (b.episode || 0) || a.file.localeCompare(b.file));
+    .sort((a, b) => (a.episode || 0) - (b.episode || 0) || ORDER.indexOf(a.format) - ORDER.indexOf(b.format) || a.file.localeCompare(b.file));
 }
 
 module.exports = { writeUploadList, readMetas };
 
 if (require.main === module) {
+  // node src/sheet.js DIR [YYYY-MM-DD first posting day]
   const dir = process.argv[2] || 'out';
-  console.log(writeUploadList(dir, readMetas(dir)));
+  const start = process.argv[3] ? new Date(`${process.argv[3]}T00:00:00`) : tomorrow();
+  console.log(writeUploadList(dir, readMetas(dir), start));
 }

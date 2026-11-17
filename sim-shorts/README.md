@@ -13,6 +13,8 @@ Generates satisfying physics-simulation YouTube Shorts: 1080×1920, 60 fps, unde
 
 Before rendering, each video is simulated ahead to pick the most watchable version of its seed: escapes are tuned to finish around 34–54 seconds, color battles favor close, back-and-forth finishes, marble races are built so the winner crosses at 38–52 seconds with plenty of lead changes, and ball battles are balanced to end at 36–52 seconds with a close but clear winner.
 
+Every video has an original background beat (kick, hats, bass and soft chords) that changes tempo and key with the seed and sits under the sound effects. Audio is normalized to YouTube's -14 LUFS.
+
 Every video carries a series label at the top ("RING ESCAPE #14", "COLOR BATTLE #3", "MARBLE RACE #7", "BALL BATTLE #2"). Episode numbers continue automatically from `out/series.json`, and the first title idea includes the episode.
 
 ## Make videos
@@ -28,9 +30,11 @@ node src/cli.js --format colors --seed 42  # same seed = same video
 node src/cli.js --count 10 --out out/week1 # a batch, alternating formats
 node src/cli.js --format race --series "Marble Mayhem" --episode 20   # your own series name and numbering
 node src/cli.js --series none               # no series label
+node src/cli.js --no-music                  # no background beat
+node src/sheet.js out/week1 2026-11-18      # rebuild the upload sheet starting on a given day
 ```
 
-Each video is written as `out/<format>-<seed>.mp4` with a `.json` next to it holding title ideas, a description and tags. Every run also writes `upload-list.md` in the output folder: a copy-and-paste sheet with the title, description, tags and a suggested pinned comment for each video. Rebuild it for any folder with `node src/sheet.js out/week1`.
+Each video is written as `out/<format>-<seed>.mp4` with a `.json` next to it holding title ideas, a description and tags. Every run also writes `upload-list.md` in the output folder: a copy-and-paste sheet with a posting time (two a day, noon and 6 PM, starting tomorrow), title, description, tags and a suggested pinned comment for each video, ordered so formats rotate. Rebuild it for any folder with `node src/sheet.js out/week1`.
 
 ## Uploading
 

@@ -8,15 +8,17 @@ const { Synth } = require('./audio');
 const escape = require('./formats/escape');
 const colors = require('./formats/colors');
 const race = require('./formats/race');
+const battle = require('./formats/battle');
 
 // How to build each format's sim from its plan.
 const FORMATS = {
   escape: { ...escape, create: (rng, p) => new escape.Escape(rng, { gapScale: p.gapScale }) },
   colors: { ...colors, create: (rng) => new colors.Colors(rng) },
   race: { ...race, create: (rng, p) => new race.Race(rng, { sections: p.sections }) },
+  battle: { ...battle, create: (rng, p) => new battle.Battle(rng, { dmgScale: p.dmgScale }) },
 };
 const rngFor = (s) => seedrandom(String(s));
-const SERIES = { escape: 'Ring Escape', colors: 'Color Battle', race: 'Marble Race' };
+const SERIES = { escape: 'Ring Escape', colors: 'Color Battle', race: 'Marble Race', battle: 'Ball Battle' };
 
 /** Next episode number for a series, remembered in the output folder. */
 function nextEpisode(outDir, name) {

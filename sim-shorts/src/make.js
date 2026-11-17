@@ -15,7 +15,7 @@ const FORMATS = {
   escape: { ...escape, create: (rng, p) => new escape.Escape(rng, { gapScale: p.gapScale, variant: p.variant }) },
   colors: { ...colors, create: (rng, p) => new colors.Colors(rng, { perTeam: p.perTeam || 1 }) },
   race: { ...race, create: (rng, p) => new race.Race(rng, { sections: p.sections }) },
-  battle: { ...battle, create: (rng, p) => new battle.Battle(rng, { dmgScale: p.dmgScale }) },
+  battle: { ...battle, create: (rng, p) => new battle.Battle(rng, { dmgScale: p.dmgScale, fighters: p.fighters || 2 }) },
 };
 const rngFor = (s) => seedrandom(String(s));
 const SERIES = { escape: 'Ring Escape', colors: 'Color Battle', race: 'Marble Race', battle: 'Ball Battle' };

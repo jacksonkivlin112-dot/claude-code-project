@@ -9,7 +9,7 @@ const { makeShort, FORMATS } = require('./make');
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`sim-shorts: generate satisfying simulation YouTube Shorts\n\n  --format ${Object.keys(FORMATS).join('|')}|random (default random)\n  --count N        how many videos (default 1)\n  --seed S         start seed (default: random)\n  --out DIR        output folder (default out)\n  --series NAME    series label shown on the video (default per format, "none" to hide)\n  --episode N      starting episode number (default: continues from out/series.json)\n  --no-music       leave out the background beat\n  --variant V      escape: classic|multiply, colors: classic|double (default: random per seed)\n`);
+  console.log(`sim-shorts: generate satisfying simulation YouTube Shorts\n\n  --format ${Object.keys(FORMATS).join('|')}|random (default random)\n  --count N        how many videos (default 1)\n  --seed S         start seed (default: random)\n  --out DIR        output folder (default out)\n  --series NAME    series label shown on the video (default per format, "none" to hide)\n  --episode N      starting episode number (default: continues from out/series.json)\n  --no-music       leave out the background beat\n  --variant V      escape: classic|multiply, colors: classic|double, battle: duel|ffa (default: random per seed)\n`);
   process.exit(0);
 }
 const count = Number(opt('count', 1));
@@ -19,7 +19,7 @@ const seed0 = opt('seed', null);
 const seriesOpt = opt('series', null); // name, or "none" for no series tag
 const epOpt = opt('episode', null);
 const music = !args.includes('--no-music');
-const variant = opt('variant', null); // escape: classic | multiply · colors: classic | double
+const variant = opt('variant', null); // escape: classic|multiply · colors: classic|double · battle: duel|ffa
 
 const path = require('node:path');
 const { writeUploadList, readMetas } = require('./sheet');

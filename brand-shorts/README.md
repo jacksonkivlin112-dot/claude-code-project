@@ -1,6 +1,6 @@
 # brand-shorts
 
-Makes original, voiced YouTube Shorts for brand deals (Launchpoint and similar creator platforms) from a brief and the brand's product media.
+Makes original, voiced TikToks (or YouTube Shorts) for brand deals (Launchpoint and similar creator platforms) from a brief and the brand's product media.
 
 Each video gets a hook headline, an AI voiceover, word-by-word captions, the product shown with motion, a numbered list or story structure, an always-on **"Paid partnership"** label, a progress bar, a quiet original music bed, and a branded end card with the call to action. Every variant rotates **hook, structure, selling points, voice and layout**, so videos for the same brand don't look duplicated (Launchpoint checks for duplicates before paying).
 
@@ -27,7 +27,9 @@ node src/make.js path/to/brief.json --count 4          # variants 1-4
 node src/make.js path/to/brief.json --start 4 --count 4 # the next 4, different again
 ```
 
-Videos go to `out/<brand>/` with `upload-list.md` (titles, descriptions, scripts and the posting checklist). Options: `--out DIR`, `--speed 1.08` (voice speed).
+Videos go to `out/<brand>/` with `upload-list.md` (captions or titles, scripts and the posting checklist). Options: `--platform tiktok|youtube` (default tiktok), `--out DIR`, `--speed 1.08` (voice speed).
+
+The layout keeps captions, the hook and the disclosure label out of each app's overlay. On TikTok that means the tabs at the top, the like/comment/share buttons down the right side, and the caption and sound name along the bottom.
 
 ## The brief
 
@@ -51,7 +53,14 @@ Copy the brief's required talking points and claims **word for word** from the b
 
 ## Posting checklist
 
+TikTok:
+- **More options → Content disclosure** → on → **Branded content**. TikTok adds its official "Paid partnership" label; brand deals without it can be removed.
+- Post with the video's own sound: branded content can't use regular TikTok songs (only the Commercial Music Library). The generated background beat is original.
+- Keep `#ad` in the caption and the on-screen label.
+
+YouTube Shorts:
 - YouTube Studio → Details → Show more → **Paid promotion** → tick "My video contains paid promotion".
-- Keep `#ad` and the on-screen label.
+
+Both:
 - Submit each posted link in the campaign dashboard.
 - Watch every video once before posting.

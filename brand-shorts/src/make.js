@@ -2,7 +2,7 @@
 // Brief + product media -> original, voiced brand Shorts (1080x1920, 30 fps).
 //
 //   node src/make.js examples/quillo/brief.json --count 4
-//   options: --out DIR (default out/<brand>)  --start N (first variant number)  --speed 1.08
+//   options: --platform tiktok|youtube (default tiktok)  --out DIR (default out/<brand>)  --start N  --speed 1.08
 //
 // Every variant rotates hook, structure, points, voice and layout, so videos for the same
 // brand don't look duplicated (Launchpoint and similar platforms check for that).
@@ -22,6 +22,13 @@ GlobalFonts.registerFromPath(path.join(ROOT, 'assets/fonts/InterDisplay-Bold.otf
 const W = 1080; const H = 1920; const FPS = 30;
 const RATE = 44100;
 const GAP = 0.14; // pause between lines
+
+// Where each app's own buttons and text sit on top of the video, so nothing important goes there.
+// TikTok: tabs at the top, like/comment/share buttons down the right edge, caption + sound at the bottom.
+const LAYOUTS = {
+  tiktok: { cx: 480, maxW: 800, capY: 1290, hookY: 210, hookL: 50, hookR: 910, labelY: 168, cardCY: 780, cardW: 800, cardH: 1000, badge: [130, 300] },
+  youtube: { cx: 520, maxW: 900, capY: 1470, hookY: 210, hookL: 60, hookR: 980, labelY: 60, cardCY: 840, cardW: 880, cardH: 1120, badge: [150, 330] },
+};
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
@@ -83,7 +90,8 @@ function textBlock(ctx, lines, cx, y, { size, color = '#fff', stroke = 0, lead =
 
 // ---- One video -----------------------------------------------------------------------
 
-async function makeVideo(brief, baseDir, i, outDir, { speed }) {
+async function makeVideo(brief, baseDir, i, outDir, { speed, platform }) {
+  const L = LAYOUTS[platform];
   const sc = scriptFor(brief, i);
   const rng = seedrandom(`${brief.brand}:${i}`);
   const tmp = path.join(outDir, `.v${i}`);
@@ -160,10 +168,10 @@ async function makeVideo(brief, baseDir, i, outDir, { speed }) {
     } else {
       ctx.drawImage(blurred(ln.img), 0, 0);
       // Fit the whole image (phone screenshots shouldn't lose their top or bottom).
-      const fit = Math.min(900 / ln.img.width, 1180 / ln.img.height);
+      const fit = Math.min(L.cardW / ln.img.width, L.cardH / ln.img.height);
       const bw = ln.img.width * fit; const bh = ln.img.height * fit;
       const s = (0.94 + 0.06 * enter) * (1 + 0.04 * u);
-      const x = W / 2 - (bw * s) / 2; const y = 860 - (bh * s) / 2 + (1 - enter) * 60;
+      const x = L.cx - (bw * s) / 2; const y = L.cardCY - (bh * s) / 2 + (1 - enter) * 60;
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 10, y + 24, bw * s, bh * s, 48); ctx.fill();
       ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, bw * s, bh * s, 48); ctx.clip();
       ctx.drawImage(ln.img, x, y, bw * s, bh * s);
@@ -173,17 +181,17 @@ async function makeVideo(brief, baseDir, i, outDir, { speed }) {
     // Numbered point badge for list videos.
     if (ln.n) {
       const r = 70 * (0.6 + 0.4 * enter);
-      ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(150, 330, r, 0, Math.PI * 2); ctx.fill();
-      ctx.font = `${Math.round(r * 1.2)}px Black`; textBlock(ctx, [String(ln.n)], 150, 336, { size: r * 1.2, color: '#14112a' });
+      ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(L.badge[0], L.badge[1], r, 0, Math.PI * 2); ctx.fill();
+      ctx.font = `${Math.round(r * 1.2)}px Black`; textBlock(ctx, [String(ln.n)], L.badge[0], L.badge[1] + 6, { size: r * 1.2, color: '#14112a' });
     }
     // Hook headline for the opening scene.
     if (ln.kind === 'hook') {
       ctx.font = '66px Black';
-      const hl = wrap(ctx, ln.text, 900);
-      const bh = hl.length * 66 * 1.15 + 50; const y0 = 210;
+      const hl = wrap(ctx, ln.text, L.hookR - L.hookL - 60);
+      const bh = hl.length * 66 * 1.15 + 50; const y0 = L.hookY;
       ctx.globalAlpha = enter;
-      ctx.fillStyle = primary; ctx.beginPath(); ctx.roundRect(60, y0, W - 120, bh, 28); ctx.fill();
-      textBlock(ctx, hl, W / 2, y0 + 25 + 66 * 0.58, { size: 66 });
+      ctx.fillStyle = primary; ctx.beginPath(); ctx.roundRect(L.hookL, y0, L.hookR - L.hookL, bh, 28); ctx.fill();
+      textBlock(ctx, hl, (L.hookL + L.hookR) / 2, y0 + 25 + 66 * 0.58, { size: 66 });
       ctx.globalAlpha = 1;
     }
     // Captions (not on the end card, which shows the CTA in full).
@@ -193,10 +201,15 @@ async function makeVideo(brief, baseDir, i, outDir, { speed }) {
       const cur = idx >= 0 ? idx : (now < words[0].s ? 0 : words.length - 1);
       const g0 = Math.floor(cur / 3) * 3;
       const group = words.slice(g0, g0 + 3);
-      ctx.font = '80px Black'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      const widths = group.map((w) => ctx.measureText(w.w).width);
-      const space = 22; const totalW = widths.reduce((a, v) => a + v, 0) + space * (group.length - 1);
-      let x = (W - totalW) / 2; const y = sc.style === 'full' ? 1480 : 1640;
+      let size = 80;
+      ctx.font = `${size}px Black`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      let widths = group.map((w) => ctx.measureText(w.w).width);
+      const space = 22; let totalW = widths.reduce((a, v) => a + v, 0) + space * (group.length - 1);
+      if (totalW > L.maxW) { // long words: shrink to stay clear of the side buttons
+        size = Math.floor(size * L.maxW / totalW); ctx.font = `${size}px Black`;
+        widths = group.map((w) => ctx.measureText(w.w).width); totalW = widths.reduce((a, v) => a + v, 0) + space * (group.length - 1);
+      }
+      let x = L.cx - totalW / 2; const y = L.capY;
       group.forEach((w, n) => {
         const on = g0 + n === cur && idx >= 0;
         ctx.lineJoin = 'round'; ctx.lineWidth = 14; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(w.w, x, y);
@@ -210,8 +223,8 @@ async function makeVideo(brief, baseDir, i, outDir, { speed }) {
     ctx.font = '30px Bold';
     const label = brief.disclosure || `Paid partnership with ${brief.brand}`;
     const lw = ctx.measureText(label).width + 40;
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(40, 60, lw, 56, 28); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(label, 60, 89);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(40, L.labelY, lw, 56, 28); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(label, 60, L.labelY + 29);
 
     await enc.write(Buffer.from(ctx.getImageData(0, 0, W, H).data.buffer));
   }
@@ -225,21 +238,30 @@ async function makeVideo(brief, baseDir, i, outDir, { speed }) {
   return { file: path.basename(out), seconds: +total.toFixed(1), structure: sc.structure, voice: sc.voice, style: sc.style, hook: sc.hook, script: sc.lines.map((l) => l.text) };
 }
 
-function sheet(brief, outDir, vids) {
+function sheet(brief, outDir, vids, platform) {
   const tags = (brief.hashtags || ['#ad']).join(' ');
-  const rows = vids.map((v, n) => [
-    `## ${n + 1}. ${v.file}  (${v.seconds}s, ${v.structure}, voice: ${v.voice}, ${v.style} layout)`,
-    '',
-    `**Title:** ${v.hook.replace(/[.!]$/, '')} #ad`,
-    '**Description:**',
-    '```',
-    `${v.hook}\n\n${brief.cta}\n\n${brief.disclosure || `Paid partnership with ${brief.brand}`}\n${tags} #shorts`,
-    '```',
-    '**Script:**',
-    ...v.script.map((s) => `> ${s}`),
-    '',
-  ].join('\n'));
-  fs.writeFileSync(path.join(outDir, 'upload-list.md'), `# ${brief.brand}: ${vids.length} videos\n\nBefore posting:\n- In YouTube Studio, open **Details → Show more → Paid promotion** and tick **"My video contains paid promotion"**. It's required for brand deals and the campaign won't pay without a disclosure.\n- Keep the on-screen "Paid partnership" label and #ad.\n- Submit each posted link in the campaign dashboard.\n- Watch every video once before posting.\n\n${rows.join('\n')}`);
+  const disclosure = brief.disclosure || `Paid partnership with ${brief.brand}`;
+  const rows = vids.map((v, n) => {
+    const head = `## ${n + 1}. ${v.file}  (${v.seconds}s, ${v.structure}, voice: ${v.voice}, ${v.style} layout)`;
+    const body = platform === 'tiktok'
+      ? ['**Caption:**', '```', `${v.hook} ${brief.cta}\n\n${tags}`, '```']
+      : [`**Title:** ${v.hook.replace(/[.!]$/, '')} #ad`, '**Description:**', '```', `${v.hook}\n\n${brief.cta}\n\n${disclosure}\n${tags} #shorts`, '```'];
+    return [head, '', ...body, '**Script:**', ...v.script.map((s) => `> ${s}`), ''].join('\n');
+  });
+  const checklist = platform === 'tiktok'
+    ? `Before posting on TikTok:
+- Tap **More options → Content disclosure**, turn it on and choose **Branded content** (or "Your brand" if it's your own). TikTok adds its official "Paid partnership" label. Brand deals posted without it can be removed.
+- Keep **#ad** in the caption and the on-screen label.
+- Post with the video's **own sound**. Branded content can't use regular TikTok songs, only the Commercial Music Library, and our original background beat is fine.
+- Put the brand's link in your bio if the call to action says "link in bio".
+- Submit each posted link in the campaign dashboard.
+- Watch every video once before posting.`
+    : `Before posting on YouTube:
+- In YouTube Studio, open **Details → Show more → Paid promotion** and tick **"My video contains paid promotion"**.
+- Keep #ad and the on-screen label.
+- Submit each posted link in the campaign dashboard.
+- Watch every video once before posting.`;
+  fs.writeFileSync(path.join(outDir, 'upload-list.md'), `# ${brief.brand}: ${vids.length} videos for ${platform === 'tiktok' ? 'TikTok' : 'YouTube Shorts'}\n\n${checklist}\n\n${rows.join('\n')}`);
 }
 
 (async () => {
@@ -250,15 +272,17 @@ function sheet(brief, outDir, vids) {
   const count = Number(opt('count', 4));
   const start = Number(opt('start', 0));
   const speed = Number(opt('speed', 1.08));
+  const platform = opt('platform', 'tiktok');
+  if (!LAYOUTS[platform]) throw new Error('--platform must be tiktok or youtube');
   const outDir = path.resolve(opt('out', path.join(ROOT, 'out', brief.brand.toLowerCase().replace(/[^a-z0-9]+/g, '-'))));
   fs.mkdirSync(outDir, { recursive: true });
   const vids = [];
   for (let i = start; i < start + count; i++) {
     const t0 = Date.now();
-    const v = await makeVideo(brief, baseDir, i, outDir, { speed });
+    const v = await makeVideo(brief, baseDir, i, outDir, { speed, platform });
     vids.push(v);
     console.log(`${v.file}  ${v.seconds}s  ${v.structure}/${v.voice}/${v.style}  "${v.hook}"  (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
   }
-  sheet(brief, outDir, vids);
+  sheet(brief, outDir, vids, platform);
   console.log(`Upload sheet: ${path.join(outDir, 'upload-list.md')}`);
 })().catch((e) => { console.error(e.message || e); process.exit(1); });

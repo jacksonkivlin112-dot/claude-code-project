@@ -1,0 +1,15 @@
+{
+  "name": "sim-shorts",
+  "version": "1.0.0",
+  "description": "Satisfying physics-simulation YouTube Shorts generator",
+  "scripts": {
+    "make": "node src/cli.js",
+    "batch": "node src/cli.js --count 10"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "seedrandom": "^3.0.5"
+  },
+  "private": true
+}

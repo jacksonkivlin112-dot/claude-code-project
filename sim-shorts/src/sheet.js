@@ -8,6 +8,7 @@ const PINNED = {
   escape: 'What time did you guess? 👇 Closest guess gets pinned next video',
   colors: 'Which color did you pick? 👇 Reply with your color before you watch the end',
   race: 'Which marble did you pick? 👇 Winners reply with 🏆',
+  battle: 'Which side did you pick? 👇',
 };
 
 function writeUploadList(dir, metas) {

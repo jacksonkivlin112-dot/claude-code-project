@@ -9,10 +9,11 @@ Generates satisfying physics-simulation YouTube Shorts: 1080×1920, 60 fps, unde
 | `escape` | A ball bounces inside 7–12 spinning rings, each with a gap. Every bounce plays the next note; slipping through a gap shatters the ring. | "Can the ball escape all N rings?" Guess the time in the comments |
 | `colors` | 2–4 colored balls each flip the squares they hit to their own color. The board swings back and forth for 52 seconds. | "Which color wins?" Pick a color in the comments |
 | `race` | 4–6 marbles race down a randomly built course of pegs, zigzag ramps, funnels, stairs and bumpers. The camera follows the leader, with live standings at the top. | "Which marble wins?" Pick a marble in the comments |
+| `battle` | Two fighter balls with different powers (Spike, Dash, Giant, Vampire, Tank) bounce around an arena. Every hit deals damage and grows the attacker's power; charging in hits harder. Health bars, floating damage numbers and a KO finish. | "Who wins?" Pick a side in the comments |
 
-Before rendering, each video is simulated ahead to pick the most watchable version of its seed: escapes are tuned to finish around 34–54 seconds, color battles favor close, back-and-forth finishes, and marble races are built so the winner crosses at 38–52 seconds with plenty of lead changes.
+Before rendering, each video is simulated ahead to pick the most watchable version of its seed: escapes are tuned to finish around 34–54 seconds, color battles favor close, back-and-forth finishes, marble races are built so the winner crosses at 38–52 seconds with plenty of lead changes, and ball battles are balanced to end at 36–52 seconds with a close but clear winner.
 
-Every video carries a series label at the top ("RING ESCAPE #14", "COLOR BATTLE #3", "MARBLE RACE #7"). Episode numbers continue automatically from `out/series.json`, and the first title idea includes the episode.
+Every video carries a series label at the top ("RING ESCAPE #14", "COLOR BATTLE #3", "MARBLE RACE #7", "BALL BATTLE #2"). Episode numbers continue automatically from `out/series.json`, and the first title idea includes the episode.
 
 ## Make videos
 
